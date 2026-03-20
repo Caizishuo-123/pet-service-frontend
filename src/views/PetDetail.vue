@@ -46,9 +46,18 @@
                 <div class="info-item">
                   <span class="info-label">健康状况</span>
                   <span class="info-value">
-                    <el-tag :type="healthTagType(pet.healthStatus)" size="small">
-                      {{ healthLabel(pet.healthStatus) }}
-                    </el-tag>
+                    <template v-if="getHealthStatusTags(pet.healthStatus).length">
+                      <el-tag
+                        v-for="item in getHealthStatusTags(pet.healthStatus)"
+                        :key="item.value"
+                        :type="item.type"
+                        size="small"
+                        class="health-tag"
+                      >
+                        {{ item.label }}
+                      </el-tag>
+                    </template>
+                    <span v-else class="health-empty">状态待更新</span>
                   </span>
                 </div>
                 <div class="info-item" v-if="pet.source">
@@ -109,6 +118,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { getPetDetail } from '@/api/pet'
 import { submitApply } from '@/api/adoption'
 import { getCosUrl } from '@/utils/request'
+import { getHealthStatusTags } from '@/utils/healthStatus'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft } from '@element-plus/icons-vue'
 
@@ -138,16 +148,6 @@ const applyRules = {
     { pattern: /^1[3-9]\d{9}$/, message: '手机号格式不正确', trigger: 'blur' }
   ],
   address: [{ required: true, message: '请输入地址', trigger: 'blur' }]
-}
-
-const healthLabel = (status) => {
-  const map = { 1: '健康', 2: '亚健康', 3: '生病', 4: '残疾' }
-  return map[status] || '未知'
-}
-
-const healthTagType = (status) => {
-  const map = { 1: 'success', 2: 'warning', 3: 'danger', 4: 'info' }
-  return map[status] || 'info'
 }
 
 const sourceLabel = (source) => {
@@ -277,6 +277,16 @@ onMounted(async () => {
   font-size: 15px;
   font-weight: 600;
   color: #303133;
+}
+
+.health-tag {
+  margin-right: 6px;
+  border-radius: 999px;
+}
+
+.health-empty {
+  color: #909399;
+  font-size: 13px;
 }
 
 .pet-description {

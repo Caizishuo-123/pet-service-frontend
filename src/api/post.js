@@ -17,6 +17,27 @@ export const getPostPage = (params) => {
 }
 
 /**
+ * 热榜帖子
+ */
+export const getHotPostPage = (params) => {
+  return request.get('/post/hot', { params })
+}
+
+/**
+ * 公告专区
+ */
+export const getNoticePage = (params) => {
+  return request.get('/post/notice', { params })
+}
+
+/**
+ * 我的帖子列表
+ */
+export const getMyPostPage = (params) => {
+  return request.get('/post/my/page', { params })
+}
+
+/**
  * 帖子详情
  */
 export const getPostDetail = (id) => {

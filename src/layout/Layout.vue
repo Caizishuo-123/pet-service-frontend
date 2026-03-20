@@ -49,6 +49,12 @@
                     </el-icon>
                     我的宠物
                   </el-dropdown-item>
+                  <el-dropdown-item @click="router.push('/my-adoptions')">
+                    <el-icon>
+                      <HomeFilled />
+                    </el-icon>
+                    我的领养
+                  </el-dropdown-item>
                   <el-dropdown-item @click="router.push('/my-appointments')">
                     <el-icon>
                       <Calendar />
@@ -60,6 +66,12 @@
                       <Ticket />
                     </el-icon>
                     我的订单
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="router.push('/my-posts')">
+                    <el-icon>
+                      <Edit />
+                    </el-icon>
+                    我的帖子
                   </el-dropdown-item>
                   <el-dropdown-item divided @click="handleLogout">
                     <el-icon>
@@ -101,7 +113,7 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { getCosUrl } from '@/utils/request'
-import { ArrowDown, Calendar, Star, SwitchButton, Ticket, User } from '@element-plus/icons-vue'
+import { ArrowDown, Calendar, Edit, HomeFilled, Star, SwitchButton, Ticket, User } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()

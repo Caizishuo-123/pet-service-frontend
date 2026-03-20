@@ -13,45 +13,10 @@ export default defineConfig({
   server: {
     port: 3002,
     proxy: {
-      '/user': {
+      '/api': {
         target: 'http://localhost:8082',
-        changeOrigin: true
-      },
-      '/email': {
-        target: 'http://localhost:8082',
-        changeOrigin: true
-      },
-      '/pet': {
-        target: 'http://localhost:8082',
-        changeOrigin: true
-      },
-      '/petService': {
-        target: 'http://localhost:8082',
-        changeOrigin: true
-      },
-      '/appointment': {
-        target: 'http://localhost:8082',
-        changeOrigin: true
-      },
-      '/orders': {
-        target: 'http://localhost:8082',
-        changeOrigin: true
-      },
-      '/adoption': {
-        target: 'http://localhost:8082',
-        changeOrigin: true
-      },
-      '/post': {
-        target: 'http://localhost:8082',
-        changeOrigin: true
-      },
-      '/comment': {
-        target: 'http://localhost:8082',
-        changeOrigin: true
-      },
-      '/like': {
-        target: 'http://localhost:8082',
-        changeOrigin: true
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, '')
       }
     }
   }

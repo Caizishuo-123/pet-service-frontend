@@ -73,8 +73,9 @@
               </div>
             </div>
 
-            <footer class="order-card-footer" v-if="item.payStatus === 0">
-              <el-button type="primary" size="small" @click="handlePay(item)">
+            <footer class="order-card-footer">
+              <el-button size="small" plain @click="openDetail(item)">详情</el-button>
+              <el-button v-if="item.payStatus === 0" type="primary" size="small" @click="handlePay(item)">
                 <span class="pay-icon">支付</span> 去支付
               </el-button>
             </footer>
@@ -91,13 +92,55 @@
       <el-pagination v-model:current-page="page" :page-size="pageSize" :total="total" layout="prev, pager, next"
         @current-change="fetchOrders" background />
     </div>
+
+    <el-dialog v-model="detailVisible" title="订单详情" width="640px" destroy-on-close>
+      <div v-if="detailLoading" class="detail-loading">
+        <el-skeleton :rows="4" animated />
+      </div>
+      <div v-else-if="detail" class="detail-content">
+        <el-steps align-center class="status-steps">
+          <el-step title="待支付" :status="orderStepStatus(detail.payStatus, 0)" />
+          <el-step title="已支付" :status="orderStepStatus(detail.payStatus, 1)" />
+        </el-steps>
+
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span>订单编号</span>
+            <strong>{{ detail.orderNo || detail.id }}</strong>
+          </div>
+          <div class="detail-item">
+            <span>服务</span>
+            <strong>{{ detail.serviceName || '未知服务' }}</strong>
+          </div>
+          <div class="detail-item">
+            <span>宠物</span>
+            <strong>{{ detail.petName || '未知宠物' }}</strong>
+          </div>
+          <div class="detail-item">
+            <span>订单金额</span>
+            <strong>¥{{ detail.totalPrice || '0.00' }}</strong>
+          </div>
+          <div class="detail-item" v-if="detail.createTime">
+            <span>创建时间</span>
+            <strong>{{ formatTime(detail.createTime) }}</strong>
+          </div>
+          <div class="detail-item" v-if="detail.payTime">
+            <span>支付时间</span>
+            <strong>{{ formatTime(detail.payTime) }}</strong>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="detailVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getMyOrders } from '@/api/order'
+import { getMyOrders, getOrderDetail } from '@/api/order'
 
 const router = useRouter()
 const orders = ref([])
@@ -106,12 +149,20 @@ const loading = ref(false)
 const currentStatus = ref(null)
 const page = ref(1)
 const pageSize = 10
+const detailVisible = ref(false)
+const detailLoading = ref(false)
+const detail = ref(null)
 
 const formatTime = (t) => {
   if (!t) return ''
   const d = new Date(t)
   const pad = (n) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+const orderStepStatus = (payStatus, index) => {
+  if (payStatus === 1) return 'success'
+  return index === 0 ? 'process' : 'wait'
 }
 
 const handleStatusChange = () => {
@@ -138,6 +189,25 @@ const fetchOrders = async () => {
 
 const handlePay = (item) => {
   router.push({ path: '/checkout', query: { orderId: item.id } })
+}
+
+const openDetail = async (item) => {
+  detailVisible.value = true
+  detailLoading.value = true
+  detail.value = null
+  try {
+    const res = await getOrderDetail(item.id)
+    if (res.code === 200) {
+      detail.value = res.data
+    } else {
+      detailVisible.value = false
+    }
+  } catch (e) {
+    console.error(e)
+    detailVisible.value = false
+  } finally {
+    detailLoading.value = false
+  }
 }
 
 onMounted(() => fetchOrders())
@@ -289,6 +359,36 @@ onMounted(() => fetchOrders())
   display: flex;
   justify-content: center;
   padding: 24px 0 16px;
+}
+
+.detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.status-steps {
+  margin-top: 4px;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.detail-item {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--surface-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-item span {
+  font-size: 12px;
+  color: var(--ink-muted);
 }
 
 @media (max-width: 960px) {

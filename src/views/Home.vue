@@ -3,11 +3,8 @@
     <section class="page-hero home-hero">
       <div class="hero-copy">
         <span class="page-kicker">宠物服务平台</span>
-        <h1 class="page-title">让领养、预约和交流，都变得更顺手一点。</h1>
-        <p class="page-desc hero-desc">
-          首页不强调夸张视觉，而是把用户最常用的内容放在最前面。先看领养宠物，再看热门服务，最后浏览社区动态，整体信息更集中，也更像一个完成度扎实的毕业设计作品。
-        </p>
-
+        <h1 class="page-title">让领养、预约和交流，<br>都变得更顺手一点。</h1>
+        <p class="hero-desc">在这里，我们连接每一个温暖的家与每一个待领养的生命。提供专业的宠物医疗与美容服务，让每一份爱心都能找到归宿。</p>
         <div class="hero-actions">
           <el-button type="primary" size="large" round @click="router.push('/adoption')">
             <el-icon><Search /></el-icon>
@@ -15,33 +12,42 @@
           </el-button>
           <el-button size="large" round @click="router.push('/services')">查看服务</el-button>
         </div>
+        <div class="hero-features">
+          <span class="feature-chip">官方认证领养</span>
+          <span class="feature-chip">24h 专家支持</span>
+          <span class="feature-chip">社区真实互动</span>
+        </div>
 
-        <div class="hero-stats">
-          <article v-for="item in metrics" :key="item.label" class="stat-card">
-            <strong>{{ item.value }}</strong>
-            <span>{{ item.label }}</span>
-          </article>
+        <div class="hero-illustration" aria-hidden="true">
+          <img src="@/assets/hero-illustration-transparent.png" alt="" />
         </div>
       </div>
 
       <div class="hero-aside">
-        <article class="hero-highlight hero-highlight-main" @click="router.push('/adoption')">
-          <span class="soft-tag">推荐入口</span>
-          <h3>{{ primaryHighlight.title }}</h3>
-          <p>{{ primaryHighlight.desc }}</p>
-          <div class="hero-highlight-meta">
-            <span>{{ primaryHighlight.metaLeft }}</span>
-            <span>{{ primaryHighlight.metaRight }}</span>
+        <article class="hero-news">
+          <div class="hero-news-head">
+            <div>
+              <span class="page-kicker">社区快讯</span>
+              <h3>今日热门标题</h3>
+            </div>
+            <button class="section-link plain-button" type="button" @click="router.push('/community')">
+              进入社区
+              <el-icon><ArrowRight /></el-icon>
+            </button>
           </div>
-        </article>
 
-        <div class="hero-highlight-list">
-          <article v-for="item in secondaryHighlights" :key="item.route" class="hero-highlight hero-highlight-sub" @click="router.push(item.route)">
-            <span class="soft-tag soft-tag-sub">{{ item.label }}</span>
-            <h3>{{ item.title }}</h3>
-            <p>{{ item.desc }}</p>
-          </article>
-        </div>
+          <div v-if="newsItems.length" class="news-list">
+            <article v-for="item in newsItems" :key="item.id" class="news-item" @click="router.push(`/post/${item.id}`)">
+              <span class="news-tag" :class="{ 'is-notice': item.__isNotice }">
+                {{ item.__isNotice ? '公告' : '社区' }}
+              </span>
+              <p class="news-title">{{ item.title || '未命名帖子' }}</p>
+              <span v-if="item.__date" class="news-date">{{ item.__date }}</span>
+            </article>
+          </div>
+          <el-empty v-else-if="loaded" description="暂无社区动态" :image-size="72" />
+          <el-skeleton v-else :rows="6" animated />
+        </article>
       </div>
     </section>
 
@@ -52,31 +58,68 @@
           <h2>先看看最近推荐的宠物档案</h2>
           <p>卡片信息保持简洁，名称、年龄、性别和品种放在同一层级，浏览起来会更整齐。</p>
         </div>
-        <button class="section-link plain-button" type="button" @click="router.push('/adoption')">
-          查看全部
-          <el-icon><ArrowRight /></el-icon>
-        </button>
+        <div class="home-heading-actions">
+          <el-button
+            class="refresh-button"
+            circle
+            size="small"
+            :loading="refreshingPets"
+            :disabled="!pets.length || refreshingPets"
+            aria-label="刷新推荐宠物"
+            title="换一批"
+            @click="refreshPets"
+          >
+            <el-icon><Refresh /></el-icon>
+          </el-button>
+          <button class="section-link plain-button" type="button" @click="router.push('/adoption')">
+            查看全部
+            <el-icon><ArrowRight /></el-icon>
+          </button>
+        </div>
       </div>
 
-      <div v-if="pets.length" class="pet-grid">
-        <article v-for="pet in pets" :key="pet.id" class="pet-card" @click="router.push(`/pet/${pet.id}`)">
-          <div class="pet-media">
-            <img :src="getCosUrl(pet.image)" :alt="pet.name" @error="setImageFallback($event, petPlaceholder)" />
-            <span class="pet-badge">{{ pet.type === 1 ? '猫咪' : '狗狗' }}</span>
-          </div>
+      <div v-if="pets.length" class="pet-marquee" :class="{ 'is-static': pets.length <= marqueeMin }">
+        <div :key="petMarqueeKey" class="pet-marquee-track" :style="{ '--marquee-duration': `${marqueeDuration}s` }">
+          <article v-for="pet in pets" :key="pet.id" class="pet-card" @click="router.push(`/pet/${pet.id}`)">
+            <div class="pet-media">
+              <img :src="getCosUrl(pet.image)" :alt="pet.name" @error="setImageFallback($event, petPlaceholder)" />
+              <span class="pet-badge">{{ pet.type === 1 ? '猫咪' : '狗狗' }}</span>
+            </div>
 
-          <div class="pet-body">
-            <div class="card-title-row">
-              <h3>{{ pet.name }}</h3>
-              <span>{{ pet.age ? `${pet.age} 岁` : '待完善' }}</span>
+            <div class="pet-body">
+              <div class="card-title-row">
+                <h3>{{ pet.name }}</h3>
+                <span>{{ pet.age ? `${pet.age} 岁` : '待完善' }}</span>
+              </div>
+              <p class="card-main-note">{{ pet.breed || '品种信息待完善' }}</p>
+              <div class="card-meta-row">
+                <span>{{ pet.gender === 1 ? '公' : pet.gender === 2 ? '母' : '未知' }}</span>
+                <span>可申请领养</span>
+              </div>
             </div>
-            <p class="card-main-note">{{ pet.breed || '品种信息待完善' }}</p>
-            <div class="card-meta-row">
-              <span>{{ pet.gender === 1 ? '公' : pet.gender === 2 ? '母' : '未知' }}</span>
-              <span>可申请领养</span>
-            </div>
-          </div>
-        </article>
+          </article>
+
+          <template v-if="pets.length > marqueeMin">
+            <article v-for="pet in pets" :key="`dup-${pet.id}`" class="pet-card" @click="router.push(`/pet/${pet.id}`)">
+              <div class="pet-media">
+                <img :src="getCosUrl(pet.image)" :alt="pet.name" @error="setImageFallback($event, petPlaceholder)" />
+                <span class="pet-badge">{{ pet.type === 1 ? '猫咪' : '狗狗' }}</span>
+              </div>
+
+              <div class="pet-body">
+                <div class="card-title-row">
+                  <h3>{{ pet.name }}</h3>
+                  <span>{{ pet.age ? `${pet.age} 岁` : '待完善' }}</span>
+                </div>
+                <p class="card-main-note">{{ pet.breed || '品种信息待完善' }}</p>
+                <div class="card-meta-row">
+                  <span>{{ pet.gender === 1 ? '公' : pet.gender === 2 ? '母' : '未知' }}</span>
+                  <span>可申请领养</span>
+                </div>
+              </div>
+            </article>
+          </template>
+        </div>
       </div>
       <el-empty v-else-if="loaded" description="暂无可领养宠物" :image-size="88" />
       <el-skeleton v-else :rows="4" animated />
@@ -134,7 +177,7 @@
               <div v-else class="post-placeholder">社区精选</div>
             </div>
             <div class="post-featured-body">
-              <span class="soft-tag">{{ postTypeLabel(posts[0].type) }}</span>
+              <span class="soft-tag">{{ postDisplayLabel(posts[0]) }}</span>
               <h3>{{ posts[0].title }}</h3>
               <p>{{ truncate(posts[0].content, 82) }}</p>
               <div class="card-meta-row">
@@ -165,7 +208,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowRight, Search } from '@element-plus/icons-vue'
+import { ArrowRight, Refresh, Search } from '@element-plus/icons-vue'
 import { getAdoptionPets, getPosts, getServices } from '@/api/home'
 import { getCosUrl } from '@/utils/request'
 import { createSvgPlaceholder } from '@/utils/placeholders'
@@ -174,19 +217,14 @@ const router = useRouter()
 const pets = ref([])
 const services = ref([])
 const posts = ref([])
-const petTotal = ref(0)
-const serviceTotal = ref(0)
-const postTotal = ref(0)
 const loaded = ref(false)
+const refreshingPets = ref(false)
+const petMarqueeKey = ref(0)
+const petPage = ref(1)
+const petTotalPages = ref(0)
 
 const petPlaceholder = createSvgPlaceholder('PET', '#eaf0f8', '#416894')
 const postPlaceholder = createSvgPlaceholder('POST', '#e4edf9', '#416894')
-
-const formatMetric = (value) => {
-  if (!loaded.value && !value) return '--'
-  if (value >= 1000) return `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k`
-  return String(value)
-}
 
 const truncate = (text, length) => {
   if (!text) return ''
@@ -209,67 +247,159 @@ const serviceTypeLabel = (type) => {
   return labels[type] || '服务'
 }
 
-const postTypeLabel = (type) => {
+const postCategoryLabel = (category) => {
   const labels = {
-    1: '晒宠',
+    1: '分享',
     2: '求助',
-    3: '科普'
+    3: '科普',
+    4: '讨论',
+    5: '其他'
   }
-  return labels[type] || '动态'
+  return labels[category] || '动态'
 }
 
-const metrics = computed(() => [
-  { label: '待领养宠物', value: formatMetric(petTotal.value) },
-  { label: '热门服务', value: formatMetric(serviceTotal.value) },
-  { label: '社区帖子', value: formatMetric(postTotal.value) }
-])
+const postDisplayLabel = (post) => {
+  if (!post) return '动态'
+  if (post.type === 2) return '公告'
+  const category = post.category ?? post.type
+  return postCategoryLabel(category)
+}
 
-const primaryHighlight = computed(() => {
-  const pet = pets.value[0]
-  return {
-    title: pet?.name ? `${pet.name} 正在等待一个新家` : '从领养大厅开始浏览平台内容',
-    desc: pet?.breed ? `${pet.breed}，资料已整理，可直接查看详细档案。` : '首页优先展示最新宠物档案，帮助用户快速进入领养流程。',
-    metaLeft: pet?.gender === 1 ? '公' : pet?.gender === 2 ? '母' : '信息待完善',
-    metaRight: pet?.age ? `${pet.age} 岁` : '等待了解'
+const NEWS_LIMIT = 6
+const ANNOUNCE_LIMIT = 2
+const marqueeMin = 4
+
+const isAnnouncement = (post) => post?.type === 2
+
+const pickPostTime = (post) =>
+  post?.publishTime ||
+  post?.createTime ||
+  post?.createdAt ||
+  post?.create_time ||
+  post?.updateTime ||
+  post?.updatedAt ||
+  post?.updated_at ||
+  ''
+
+const formatNewsDate = (value) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value).slice(0, 10)
+  return `${date.getMonth() + 1}/${date.getDate()}`
+}
+
+const shuffle = (items) => {
+  const result = items.slice()
+  for (let i = result.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[result[i], result[j]] = [result[j], result[i]]
   }
+  return result
+}
+
+const PET_PAGE_SIZE = 6
+
+const pickTotalPages = (payload) => {
+  if (!payload) return 0
+  const candidates = [
+    payload.pages,
+    payload.totalPages,
+    payload.total_pages,
+    payload.pageCount,
+    payload.page_count
+  ]
+  for (const value of candidates) {
+    const num = Number(value)
+    if (Number.isFinite(num) && num > 0) return num
+  }
+  return 0
+}
+
+const loadPets = async (page) => {
+  const res = await getAdoptionPets(page, PET_PAGE_SIZE)
+  if (res?.code !== 200) return false
+
+  const payload = res.data || {}
+  pets.value = shuffle(payload.records || [])
+  petTotalPages.value = pickTotalPages(payload)
+  petPage.value = page
+  return true
+}
+
+const refreshPets = async () => {
+  if (refreshingPets.value) return
+  refreshingPets.value = true
+
+  try {
+    const total = petTotalPages.value
+    const nextPage = total > 1 ? (petPage.value % total) + 1 : 1
+    const ok = await loadPets(nextPage)
+
+    // Fallback: at least rotate/shuffle locally so UI feels responsive.
+    if (!ok && pets.value.length > 1) {
+      pets.value = shuffle(pets.value)
+    }
+  } catch (error) {
+    console.error('刷新推荐宠物失败', error)
+    if (pets.value.length > 1) {
+      pets.value = shuffle(pets.value)
+    }
+  } finally {
+    petMarqueeKey.value += 1
+    refreshingPets.value = false
+  }
+}
+
+const marqueeDuration = computed(() => Math.max(18, pets.value.length * 3.5))
+
+const newsItems = computed(() => {
+  if (!posts.value.length) return []
+  const items = posts.value.slice()
+  const byTime = items
+    .map((post) => ({ post, time: new Date(pickPostTime(post)).getTime() || 0 }))
+    .sort((a, b) => b.time - a.time)
+    .map((entry) => entry.post)
+
+  const announcements = byTime.filter(isAnnouncement).slice(0, ANNOUNCE_LIMIT)
+  const announcementIds = new Set(announcements.map((post) => post.id))
+  const regularPool = items.filter((post) => !isAnnouncement(post) && !announcementIds.has(post.id))
+  const fillCount = Math.max(NEWS_LIMIT - announcements.length, 0)
+  const randomPosts = shuffle(regularPool).slice(0, fillCount)
+
+  return [
+    ...announcements.map((post) => ({
+      ...post,
+      __isNotice: true,
+      __date: formatNewsDate(pickPostTime(post))
+    })),
+    ...randomPosts.map((post) => ({
+      ...post,
+      __isNotice: false,
+      __date: formatNewsDate(pickPostTime(post))
+    }))
+  ]
 })
-
-const secondaryHighlights = computed(() => [
-  {
-    label: '服务预约',
-    title: services.value[0]?.name || '查看常用护理与照护服务',
-    desc: truncate(services.value[0]?.description || '洗护、美容、医疗和寄养服务都支持分类查看。', 40),
-    route: '/services'
-  },
-  {
-    label: '社区分享',
-    title: posts.value[0]?.title || '看看大家最近在讨论什么',
-    desc: truncate(posts.value[0]?.content || '社区板块集中展示晒宠、求助与科普内容。', 40),
-    route: '/community'
-  }
-])
-
 onMounted(async () => {
   try {
     const [petRes, serviceRes, postRes] = await Promise.allSettled([
-      getAdoptionPets(1, 4),
+      getAdoptionPets(1, PET_PAGE_SIZE),
       getServices(1, 4),
-      getPosts(1, 4)
+      getPosts(1, 12)
     ])
 
     if (petRes.status === 'fulfilled' && petRes.value?.code === 200) {
-      pets.value = petRes.value.data?.records || []
-      petTotal.value = petRes.value.data?.total || pets.value.length
+      const payload = petRes.value.data || {}
+      pets.value = shuffle(payload.records || [])
+      petTotalPages.value = pickTotalPages(payload)
+      petPage.value = 1
     }
 
     if (serviceRes.status === 'fulfilled' && serviceRes.value?.code === 200) {
       services.value = serviceRes.value.data?.records || []
-      serviceTotal.value = serviceRes.value.data?.total || services.value.length
     }
 
     if (postRes.status === 'fulfilled' && postRes.value?.code === 200) {
       posts.value = postRes.value.data?.records || []
-      postTotal.value = postRes.value.data?.total || posts.value.length
     }
   } catch (error) {
     console.error('首页数据加载失败', error)
@@ -285,17 +415,45 @@ onMounted(async () => {
 }
 
 .home-hero {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.95fr);
-  gap: 24px;
-  align-items: stretch;
-  background: linear-gradient(180deg, #f7fbff 0%, #ffffff 100%);
+  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.8fr);
+  gap: 40px;
+  align-items: center;
+  background: radial-gradient(circle at 20% 50%, rgba(95, 136, 198, 0.05) 0%, transparent 50%),
+              linear-gradient(180deg, #f7fbff 0%, #ffffff 100%);
+  overflow: hidden;
 }
 
+
 .hero-copy {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  align-self: stretch;
+}
+
+.hero-copy > * {
+  position: relative;
+  z-index: 2;
+}
+
+.hero-illustration {
+  position: absolute;
+  right: -8px;
+  bottom: -35px;
+  width: clamp(180px, 26vw, 320px);
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+  opacity: 0.98;
+  filter: drop-shadow(0 16px 38px rgba(37, 54, 74, 0.12));
+}
+
+.hero-illustration img {
+  width: 100%;
+  height: auto;
 }
 
 .hero-desc {
@@ -304,20 +462,36 @@ onMounted(async () => {
 
 .hero-actions {
   display: flex;
+  gap: 16px;
+  margin-top: 60px;
+}
+
+.hero-features {
+  display: flex;
   gap: 12px;
-  flex-wrap: wrap;
-  margin: 28px 0 24px;
+  margin-top: 20px;
 }
 
-.hero-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  margin-top: auto;
+.feature-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  font-size: 13px;
+  color: var(--ink-body);
+  font-weight: 600;
+  transition: all 0.3s ease;
 }
 
-.stat-card,
-.hero-highlight,
+.feature-chip:hover {
+  background: #fff;
+  border-color: var(--brand);
+  transform: translateY(-1px);
+}
+
+.hero-news,
 .pet-card,
 .service-card,
 .post-featured,
@@ -327,42 +501,88 @@ onMounted(async () => {
   box-shadow: var(--shadow-sm);
 }
 
-.stat-card {
+.hero-news {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  min-height: 96px;
-  padding: 18px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, #ffffff 0%, #f6f9fd 100%);
-}
-
-.stat-card strong {
-  color: var(--brand-strong);
-  font-size: 28px;
-  line-height: 1;
-}
-
-.stat-card span {
-  margin-top: 8px;
-  color: var(--ink-body);
-  font-size: 13px;
+  gap: 16px;
+  padding: 24px;
+  border-radius: 24px;
+  height: 100%;
 }
 
 .hero-aside {
-  display: grid;
-  grid-template-rows: 1.25fr auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.hero-news-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
   gap: 16px;
 }
 
-.hero-highlight {
-  border-radius: 20px;
-  padding: 20px;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+.hero-news-head h3 {
+  margin: 8px 0 0;
+  font-size: 20px;
 }
 
-.hero-highlight:hover,
+.news-list {
+  display: grid;
+  gap: 12px;
+}
+
+.news-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--surface-soft);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.news-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+  background: #f3f7ff;
+}
+
+.news-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.news-tag.is-notice {
+  background: #fde7cf;
+  color: #9a6b2f;
+}
+
+.news-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.news-date {
+  font-size: 12px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
 .pet-card:hover,
 .service-card:hover,
 .post-featured:hover,
@@ -370,21 +590,6 @@ onMounted(async () => {
   transform: translateY(-3px);
   box-shadow: var(--shadow-md);
 }
-
-.hero-highlight-main {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  min-height: 240px;
-}
-
-.hero-highlight-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.hero-highlight h3,
 .pet-body h3,
 .service-card h3,
 .post-featured h3,
@@ -394,7 +599,6 @@ onMounted(async () => {
   line-height: 1.35;
 }
 
-.hero-highlight p,
 .service-card p,
 .post-featured p,
 .post-mini-card p {
@@ -402,7 +606,6 @@ onMounted(async () => {
   line-height: 1.75;
 }
 
-.hero-highlight-meta,
 .card-meta-row,
 .card-title-row,
 .service-card-top {
@@ -412,15 +615,10 @@ onMounted(async () => {
   gap: 10px;
 }
 
-.hero-highlight-meta,
 .card-meta-row span,
 .card-title-row span {
   color: var(--ink-muted);
   font-size: 13px;
-}
-
-.soft-tag-sub {
-  background: var(--surface-soft);
 }
 
 .section-panel {
@@ -432,6 +630,13 @@ onMounted(async () => {
   margin-bottom: 24px;
 }
 
+.home-heading-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+
 .plain-button {
   border: none;
   background: transparent;
@@ -439,16 +644,44 @@ onMounted(async () => {
   cursor: pointer;
 }
 
-.pet-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.refresh-button {
+  --el-button-size: 38px;
+  --el-button-bg-color: rgba(95, 136, 198, 0.12);
+  --el-button-border-color: rgba(95, 136, 198, 0.18);
+  --el-button-text-color: var(--brand-strong);
+  --el-button-hover-bg-color: rgba(95, 136, 198, 0.2);
+  --el-button-hover-border-color: rgba(95, 136, 198, 0.26);
+  --el-button-hover-text-color: var(--brand-strong);
+  --el-button-active-bg-color: rgba(95, 136, 198, 0.24);
+  --el-button-active-border-color: rgba(95, 136, 198, 0.3);
+  box-shadow: 0 8px 18px rgba(95, 136, 198, 0.14);
+}
+
+.pet-marquee {
+  position: relative;
+  overflow: hidden;
+}
+
+.pet-marquee-track {
+  display: flex;
   gap: 20px;
+  width: max-content;
+  animation: pet-marquee var(--marquee-duration, 24s) linear infinite;
+}
+
+.pet-marquee:hover .pet-marquee-track {
+  animation-play-state: paused;
+}
+
+.pet-marquee.is-static .pet-marquee-track {
+  animation: none;
 }
 
 .pet-card {
   border-radius: 20px;
   overflow: hidden;
   cursor: pointer;
+  flex: 0 0 240px;
 }
 
 .pet-media {
@@ -502,6 +735,8 @@ onMounted(async () => {
 
 .service-panel,
 .community-panel {
+  display: flex;
+  flex-direction: column;
   border-radius: 24px;
 }
 
@@ -513,6 +748,9 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+  flex: 1;
+  grid-auto-rows: 1fr;
+  align-content: stretch;
 }
 
 .service-card {
@@ -522,6 +760,7 @@ onMounted(async () => {
   padding: 18px;
   border-radius: 20px;
   cursor: pointer;
+  height: 100%;
 }
 
 .service-card-top strong {
@@ -538,6 +777,7 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
   gap: 18px;
+  flex: 1;
 }
 
 .post-featured {
@@ -597,31 +837,52 @@ onMounted(async () => {
   margin: 10px 0 14px;
 }
 
+@keyframes pet-marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
 @media (max-width: 1180px) {
-  .pet-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .home-hero {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+
+  .hero-illustration {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    width: min(320px, 76%);
+    margin-top: 22px;
+    align-self: flex-end;
+    opacity: 1;
+  }
+
+  .hero-illustration img {
+    max-width: none;
   }
 
   .content-split,
-  .community-content,
-  .home-hero {
+  .community-content {
     grid-template-columns: 1fr;
-  }
-
-  .hero-aside {
-    grid-template-rows: auto;
   }
 }
 
 @media (max-width: 760px) {
-  .service-grid {
-    grid-template-columns: 1fr;
+  .hero-stats {
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
   }
 
-  .hero-actions,
-  .hero-stats,
-  .hero-highlight-list,
-  .pet-grid {
+  .stat-line {
+    display: none;
+  }
+  .service-grid {
     grid-template-columns: 1fr;
   }
 
@@ -631,6 +892,34 @@ onMounted(async () => {
 
   .hero-actions :deep(.el-button) {
     width: 100%;
+  }
+
+  .hero-news {
+    min-height: auto;
+  }
+
+  .hero-news-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .home-heading-actions {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .news-item {
+    grid-template-columns: auto 1fr;
+  }
+
+  .news-date {
+    display: none;
+  }
+
+  .pet-card {
+    flex-basis: 200px;
   }
 
   .section-panel {

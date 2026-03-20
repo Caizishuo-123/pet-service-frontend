@@ -8,6 +8,15 @@ export const getAdoptionPage = (params) => {
 }
 
 /**
+ * 获取可领养宠物品种列表
+ */
+export const getAdoptionBreeds = (type) => {
+  const params = {}
+  if (type) params.type = type
+  return request.get('/pet/breeds', { params })
+}
+
+/**
  * 获取宠物详情
  */
 export const getPetDetail = (id) => {

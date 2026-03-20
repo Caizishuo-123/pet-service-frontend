@@ -16,19 +16,23 @@
     <template v-if="userInfo">
       <div class="profile-layout">
         <aside class="profile-aside surface-panel">
-          <div class="avatar-wrap" @click="triggerUpload">
-            <el-avatar :size="100" :src="getCosUrl(userInfo.avatar)" v-if="userInfo.avatar" />
-            <el-avatar :size="100" class="avatar-fallback" v-else>
-              {{ userInfo.username?.charAt(0)?.toUpperCase() || 'U' }}
-            </el-avatar>
-            <div class="avatar-overlay">
-              <el-icon :size="24">
-                <Camera />
+          <el-upload
+            class="avatar-uploader"
+            action="/api/user/update-avatar"
+            :headers="uploadHeaders"
+            :show-file-list="false"
+            :on-success="handleAvatarSuccess"
+            :on-error="handleAvatarError"
+            :before-upload="beforeAvatarUpload"
+          >
+            <img v-if="userInfo.avatar" :src="getCosUrl(userInfo.avatar)" class="avatar-image" />
+            <div v-else class="avatar-placeholder">
+              <el-icon class="avatar-icon">
+                <Plus />
               </el-icon>
-              <span>更换头像</span>
+              <span>上传头像</span>
             </div>
-          </div>
-          <input ref="fileInput" type="file" accept="image/*" hidden @change="handleUpload" />
+          </el-upload>
           <h3 class="avatar-username">{{ userInfo.username }}</h3>
           <p class="avatar-email">{{ userInfo.email }}</p>
           <div class="avatar-meta">
@@ -116,18 +120,17 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
-import { getCurrentUserInfo, updateInfo, updateAvatar, updatePassword } from '@/api/user'
+import { computed, ref, reactive, onMounted, onUnmounted } from 'vue'
+import { getCurrentUserInfo, updateInfo, updatePassword } from '@/api/user'
 import { sendCode } from '@/api/email'
 import { getCosUrl } from '@/utils/request'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
-import { Camera } from '@element-plus/icons-vue'
+import { Plus } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 const userInfo = ref(null)
 const loading = ref(true)
-const fileInput = ref(null)
 
 // 编辑地址
 const editingAddress = ref(false)
@@ -180,6 +183,11 @@ const pwdRules = {
   confirmPassword: [{ required: true, validator: validateConfirm, trigger: 'blur' }]
 }
 
+const uploadHeaders = computed(() => {
+  const token = localStorage.getItem('token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+})
+
 // ===== 数据加载 =====
 const fetchUserInfo = async () => {
   try {
@@ -195,30 +203,31 @@ const fetchUserInfo = async () => {
 }
 
 // ===== 头像上传 =====
-const triggerUpload = () => fileInput.value?.click()
-
-const handleUpload = async (e) => {
-  const file = e.target.files?.[0]
-  if (!file) return
-  if (file.size > 5 * 1024 * 1024) {
-    ElMessage.warning('图片大小不能超过 5MB')
-    return
+const handleAvatarSuccess = (response) => {
+  if (response?.code === 200) {
+    ElMessage.success('头像更新成功')
+    userInfo.value.avatar = response.data
+    userStore.updateUserInfo({ avatar: response.data })
+  } else {
+    ElMessage.error(response?.message || response?.msg || '上传失败')
   }
+}
 
-  try {
-    const res = await updateAvatar(file)
-    if (res.code === 200) {
-      ElMessage.success('头像更新成功')
-      userInfo.value.avatar = res.data
-      userStore.updateUserInfo({ avatar: res.data })
-    } else {
-      ElMessage.error(res.message || '上传失败')
-    }
-  } catch (e) {
-    ElMessage.error(e.response?.data?.message || '上传失败')
-  } finally {
-    fileInput.value.value = ''
+const handleAvatarError = () => {
+  ElMessage.error('上传失败，请稍后重试')
+}
+
+const beforeAvatarUpload = (rawFile) => {
+  const isValidFormat = rawFile.type === 'image/jpeg' || rawFile.type === 'image/png' || rawFile.type === 'image/webp'
+  const isLt5M = rawFile.size / 1024 / 1024 < 5
+
+  if (!isValidFormat) {
+    ElMessage.error('上传图片只能是 JPG/PNG/WEBP 格式!')
   }
+  if (!isLt5M) {
+    ElMessage.error('上传图片大小不能超过 5MB!')
+  }
+  return isValidFormat && isLt5M
 }
 
 // ===== 编辑地址 =====
@@ -340,38 +349,48 @@ onUnmounted(() => { if (cooldownTimer) clearInterval(cooldownTimer) })
   border-radius: var(--radius-md);
 }
 
-.avatar-wrap {
-  position: relative;
-  display: inline-block;
+.avatar-uploader :deep(.el-upload) {
+  width: 120px;
+  height: 120px;
+  border-radius: 24px;
+  border: 1px dashed var(--line-soft);
+  background: var(--surface-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  border-radius: 50%;
-  overflow: hidden;
-  box-shadow: 0 12px 24px rgba(37, 54, 74, 0.12);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
-.avatar-fallback {
-  background: linear-gradient(135deg, #5f88c6, #7aa0d8);
-  color: #fff;
-  font-size: 36px;
+.avatar-uploader :deep(.el-upload:hover) {
+  border-color: var(--brand-strong);
+  background: #fff;
+  box-shadow: 0 10px 22px rgba(37, 54, 74, 0.08);
 }
 
-.avatar-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(37, 54, 74, 0.62);
+.avatar-image {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 22px;
+  display: block;
+}
+
+.avatar-placeholder {
+  width: 120px;
+  height: 120px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  gap: 6px;
+  color: var(--ink-muted);
   font-size: 12px;
-  opacity: 0;
-  transition: opacity 0.25s ease;
-  gap: 4px;
 }
 
-.avatar-wrap:hover .avatar-overlay {
-  opacity: 1;
+.avatar-icon {
+  font-size: 24px;
+  color: var(--ink-muted);
 }
 
 .avatar-username {

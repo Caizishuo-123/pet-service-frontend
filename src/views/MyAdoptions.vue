@@ -1,29 +1,30 @@
 <template>
-  <div class="appointments-page page-shell">
-    <section class="page-hero appointments-hero">
+  <div class="my-adoptions-page page-shell">
+    <section class="page-hero adoptions-hero">
       <div class="hero-copy">
-        <span class="page-kicker">我的预约</span>
-        <h1 class="page-title">查看你的服务预约</h1>
-        <p class="page-desc">管理服务时间、宠物信息与预约状态，安排更清晰。</p>
+        <span class="page-kicker">我的领养</span>
+        <h1 class="page-title">跟踪领养申请进度</h1>
+        <p class="page-desc">查看每条申请的审核状态与进展，随时掌握领养结果。</p>
       </div>
       <div class="hero-tags">
         <span class="soft-chip">支持状态筛选</span>
-        <span class="soft-chip">可快速取消预约</span>
+        <span class="soft-chip">进度清晰可视化</span>
       </div>
     </section>
 
-    <section class="surface-panel appointments-panel">
-      <div class="section-heading appointments-heading">
+    <section class="surface-panel adoptions-panel">
+      <div class="section-heading adoptions-heading">
         <div>
-          <h2>预约记录</h2>
-          <p>聚焦服务与时间信息，快速确认安排。</p>
+          <h2>申请记录</h2>
+          <p>等待审核、通过、拒绝和完成的申请都在这里。</p>
         </div>
         <div class="filter-shell">
           <el-radio-group v-model="currentStatus" @change="handleStatusChange" size="large">
             <el-radio-button :value="null">全部</el-radio-button>
-            <el-radio-button :value="1">已预约</el-radio-button>
-            <el-radio-button :value="2">已完成</el-radio-button>
-            <el-radio-button :value="3">已取消</el-radio-button>
+            <el-radio-button :value="1">待审核</el-radio-button>
+            <el-radio-button :value="2">已通过</el-radio-button>
+            <el-radio-button :value="3">已拒绝</el-radio-button>
+            <el-radio-button :value="4">已完成</el-radio-button>
           </el-radio-group>
         </div>
       </div>
@@ -33,86 +34,85 @@
       </div>
 
       <template v-else>
-        <div v-if="appointments.length" class="appointment-list">
-          <article class="appointment-card" v-for="item in appointments" :key="item.id">
+        <div v-if="applies.length" class="apply-list">
+          <article class="apply-card" v-for="item in applies" :key="item.id">
             <div class="card-left">
-              <img v-if="item.petImage" :src="getCosUrl(item.petImage)" class="pet-avatar"
-                @error="(e) => e.target.src = 'https://via.placeholder.com/60?text=pet'" />
+              <img
+                v-if="item.petImage"
+                :src="getCosUrl(item.petImage)"
+                class="pet-avatar"
+                @error="(e) => e.target.src = 'https://via.placeholder.com/60?text=pet'"
+              />
               <div v-else class="pet-avatar-placeholder">宠</div>
             </div>
             <div class="card-body">
               <div class="card-row-top">
-                <h4 class="card-title">{{ item.serviceName || '未知服务' }}</h4>
+                <h4 class="card-title">{{ item.petName || '未知宠物' }}</h4>
                 <el-tag :type="statusTagType(item.status)" size="small" class="status-tag">
                   {{ statusLabel(item.status) }}
                 </el-tag>
               </div>
               <p class="card-info">
-                <span>宠物 · {{ item.petName || '未知宠物' }}</span>
-                <span v-if="item.servicePrice">费用 · ¥{{ item.servicePrice }}</span>
+                <span>品种 · {{ item.petBreed || '未知' }}</span>
+                <span>方式 · {{ deliveryLabel(item.deliveryType) }}</span>
               </p>
-              <p class="card-time" v-if="item.appointmentTime">
-                预约时间 · {{ formatTime(item.appointmentTime) }}
+              <p class="card-time" v-if="item.createTime">
+                申请时间 · {{ formatTime(item.createTime) }}
               </p>
-              <p class="card-remark" v-if="item.remark">备注 · {{ item.remark }}</p>
+              <p class="card-remark" v-if="item.applyReason">理由 · {{ item.applyReason }}</p>
             </div>
             <div class="card-actions">
-              <el-button type="primary" size="small" plain @click="openDetail(item)">详情</el-button>
-              <el-button v-if="item.status === 1" type="danger" size="small" plain @click="handleCancel(item)">
-                取消预约
-              </el-button>
+              <el-button size="small" plain @click="openDetail(item)">详情</el-button>
             </div>
           </article>
         </div>
 
-        <el-empty v-else description="暂无预约记录" :image-size="120">
-          <el-button type="primary" @click="router.push('/services')">去预约服务</el-button>
+        <el-empty v-else description="暂无领养申请" :image-size="120">
+          <el-button type="primary" @click="router.push('/adoption')">去领养大厅</el-button>
         </el-empty>
       </template>
     </section>
 
     <div class="pagination-wrap" v-if="total > 0">
       <el-pagination v-model:current-page="page" :page-size="pageSize" :total="total" layout="prev, pager, next"
-        @current-change="fetchAppointments" background />
+        @current-change="fetchApplies" background />
     </div>
 
-    <el-dialog v-model="detailVisible" title="预约详情" width="640px" destroy-on-close>
+    <el-dialog v-model="detailVisible" title="领养申请详情" width="680px" destroy-on-close>
       <div v-if="detailLoading" class="detail-loading">
         <el-skeleton :rows="4" animated />
       </div>
       <div v-else-if="detail" class="detail-content">
         <el-steps align-center class="status-steps">
-          <el-step title="已预约" :status="appointmentStepStatus(detail.status, 0)" />
-          <el-step title="服务完成" :status="appointmentStepStatus(detail.status, 1)" />
-          <el-step title="已取消" :status="appointmentStepStatus(detail.status, 2)" />
+          <el-step title="待审核" :status="adoptionStepStatus(detail.status, 0)" />
+          <el-step title="审核结果" :status="adoptionStepStatus(detail.status, 1)" />
+          <el-step title="已完成" :status="adoptionStepStatus(detail.status, 2)" />
         </el-steps>
 
         <div class="detail-grid">
-          <div class="detail-item">
-            <span>服务</span>
-            <strong>{{ detail.serviceName || '未知服务' }}</strong>
-          </div>
           <div class="detail-item">
             <span>宠物</span>
             <strong>{{ detail.petName || '未知宠物' }}</strong>
           </div>
           <div class="detail-item">
-            <span>预约时间</span>
-            <strong>{{ formatTime(detail.appointmentTime) || '-' }}</strong>
+            <span>品种</span>
+            <strong>{{ detail.petBreed || '-' }}</strong>
           </div>
           <div class="detail-item">
-            <span>状态</span>
-            <el-tag :type="statusTagType(detail.status)" size="small">
-              {{ statusLabel(detail.status) }}
-            </el-tag>
+            <span>领取方式</span>
+            <strong>{{ deliveryLabel(detail.deliveryType) }}</strong>
           </div>
-          <div class="detail-item" v-if="detail.servicePrice">
-            <span>服务价格</span>
-            <strong>¥{{ detail.servicePrice }}</strong>
+          <div class="detail-item">
+            <span>联系电话</span>
+            <strong>{{ detail.contactPhone || '-' }}</strong>
           </div>
-          <div class="detail-item" v-if="detail.remark">
-            <span>备注</span>
-            <strong>{{ detail.remark }}</strong>
+          <div class="detail-item" v-if="detail.address">
+            <span>送达地址</span>
+            <strong>{{ detail.address }}</strong>
+          </div>
+          <div class="detail-item" v-if="detail.applyReason">
+            <span>申请理由</span>
+            <strong>{{ detail.applyReason }}</strong>
           </div>
         </div>
       </div>
@@ -126,29 +126,35 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getMyAppointments, cancelAppointment, getAppointmentDetail } from '@/api/appointment'
+import { getMyApplies, getApplyDetail } from '@/api/adoption'
 import { getCosUrl } from '@/utils/request'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
-const appointments = ref([])
+const applies = ref([])
 const total = ref(0)
 const loading = ref(false)
 const currentStatus = ref(null)
 const page = ref(1)
 const pageSize = 10
+
 const detailVisible = ref(false)
 const detailLoading = ref(false)
 const detail = ref(null)
 
 const statusLabel = (s) => {
-  const map = { 1: '已预约', 2: '已完成', 3: '已取消' }
+  const map = { 1: '待审核', 2: '已通过', 3: '已拒绝', 4: '已完成' }
   return map[s] || '未知'
 }
 
 const statusTagType = (s) => {
-  const map = { 1: 'primary', 2: 'success', 3: 'info' }
+  const map = { 1: 'warning', 2: 'success', 3: 'danger', 4: 'info' }
   return map[s] || 'info'
+}
+
+const deliveryLabel = (d) => {
+  const map = { 1: '上门自取', 2: '送宠上门' }
+  return map[d] || '未选择'
 }
 
 const formatTime = (t) => {
@@ -158,7 +164,7 @@ const formatTime = (t) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-const appointmentStepStatus = (status, index) => {
+const adoptionStepStatus = (status, index) => {
   if (status === 1) {
     return index === 0 ? 'process' : 'wait'
   }
@@ -167,55 +173,34 @@ const appointmentStepStatus = (status, index) => {
   }
   if (status === 3) {
     if (index === 0) return 'success'
-    if (index === 2) return 'error'
+    if (index === 1) return 'error'
     return 'wait'
+  }
+  if (status === 4) {
+    return 'success'
   }
   return 'wait'
 }
 
 const handleStatusChange = () => {
   page.value = 1
-  fetchAppointments()
+  fetchApplies()
 }
 
-const fetchAppointments = async () => {
+const fetchApplies = async () => {
   loading.value = true
   try {
     const params = { page: page.value, pageSize }
     if (currentStatus.value) params.status = currentStatus.value
-    const res = await getMyAppointments(params)
+    const res = await getMyApplies(params)
     if (res.code === 200) {
-      appointments.value = res.data?.records || []
+      applies.value = res.data?.records || []
       total.value = res.data?.total || 0
     }
   } catch (e) {
-    console.error('获取预约列表失败', e)
+    console.error('获取领养申请失败', e)
   } finally {
     loading.value = false
-  }
-}
-
-const handleCancel = async (item) => {
-  try {
-    await ElMessageBox.confirm(
-      `确定要取消「${item.serviceName}」的预约吗？`,
-      '取消预约',
-      { confirmButtonText: '确认取消', cancelButtonText: '返回', type: 'warning' }
-    )
-  } catch {
-    return
-  }
-
-  try {
-    const res = await cancelAppointment(item.id)
-    if (res.code === 200) {
-      ElMessage.success('已取消预约')
-      fetchAppointments()
-    } else {
-      ElMessage.error(res.message || '取消失败')
-    }
-  } catch (e) {
-    ElMessage.error(e.response?.data?.message || '取消失败，请稍后重试')
   }
 }
 
@@ -224,7 +209,7 @@ const openDetail = async (item) => {
   detailLoading.value = true
   detail.value = null
   try {
-    const res = await getAppointmentDetail(item.id)
+    const res = await getApplyDetail(item.id)
     if (res.code === 200) {
       detail.value = res.data
     } else {
@@ -232,7 +217,6 @@ const openDetail = async (item) => {
       detailVisible.value = false
     }
   } catch (e) {
-    console.error(e)
     ElMessage.error(e.response?.data?.message || '获取详情失败')
     detailVisible.value = false
   } finally {
@@ -240,15 +224,15 @@ const openDetail = async (item) => {
   }
 }
 
-onMounted(() => fetchAppointments())
+onMounted(() => fetchApplies())
 </script>
 
 <style scoped>
-.appointments-page {
+.my-adoptions-page {
   padding-bottom: 24px;
 }
 
-.appointments-hero {
+.adoptions-hero {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -268,22 +252,22 @@ onMounted(() => fetchAppointments())
   align-items: center;
 }
 
-.appointments-panel {
+.adoptions-panel {
   padding: 28px;
   border-radius: var(--radius-lg);
 }
 
-.appointments-heading {
+.adoptions-heading {
   margin-bottom: 22px;
   align-items: flex-start;
 }
 
-.appointments-heading h2 {
+.adoptions-heading h2 {
   margin: 8px 0 10px;
   font-size: 26px;
 }
 
-.appointments-heading p {
+.adoptions-heading p {
   margin: 0;
   color: var(--ink-body);
 }
@@ -294,14 +278,13 @@ onMounted(() => fetchAppointments())
   border-radius: 999px;
 }
 
-/* ========== Appointment Cards ========== */
-.appointment-list {
+.apply-list {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.appointment-card {
+.apply-card {
   background: var(--surface-strong);
   border-radius: var(--radius-md);
   padding: 20px 22px;
@@ -313,7 +296,7 @@ onMounted(() => fetchAppointments())
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.appointment-card:hover {
+.apply-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
@@ -327,7 +310,6 @@ onMounted(() => fetchAppointments())
   height: 64px;
   border-radius: 16px;
   object-fit: cover;
-  box-shadow: 0 10px 22px rgba(37, 54, 74, 0.12);
 }
 
 .pet-avatar-placeholder {
@@ -428,16 +410,16 @@ onMounted(() => fetchAppointments())
 }
 
 @media (max-width: 960px) {
-  .appointments-hero {
+  .adoptions-hero {
     flex-direction: column;
     align-items: flex-start;
   }
 
-  .appointments-panel {
+  .adoptions-panel {
     padding: 22px;
   }
 
-  .appointment-card {
+  .apply-card {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -448,7 +430,7 @@ onMounted(() => fetchAppointments())
 }
 
 @media (max-width: 640px) {
-  .appointments-heading {
+  .adoptions-heading {
     gap: 12px;
   }
 
@@ -459,6 +441,10 @@ onMounted(() => fetchAppointments())
   .card-info {
     flex-direction: column;
     gap: 6px;
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

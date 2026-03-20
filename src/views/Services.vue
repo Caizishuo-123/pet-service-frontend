@@ -19,17 +19,50 @@
     </section>
 
     <section class="section-block surface-panel filter-panel list-filter-panel">
-      <div class="filter-row">
-        <span class="filter-label">服务类型</span>
-        <el-radio-group v-model="currentType" @change="handleTypeChange">
-          <el-radio-button :value="null">全部</el-radio-button>
-          <el-radio-button :value="1">洗护</el-radio-button>
-          <el-radio-button :value="2">美容</el-radio-button>
-          <el-radio-button :value="3">医疗</el-radio-button>
-          <el-radio-button :value="4">寄养</el-radio-button>
-        </el-radio-group>
+      <div class="filter-group">
+        <div class="filter-row">
+          <span class="filter-label">服务类型</span>
+          <el-radio-group v-model="currentType" @change="handleTypeChange">
+            <el-radio-button :value="null">全部</el-radio-button>
+            <el-radio-button :value="1">洗护</el-radio-button>
+            <el-radio-button :value="2">美容</el-radio-button>
+            <el-radio-button :value="3">医疗</el-radio-button>
+            <el-radio-button :value="4">寄养</el-radio-button>
+          </el-radio-group>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">价格区间</span>
+          <div class="range-inputs">
+            <el-input-number v-model="priceMin" :min="0" :max="9999" controls-position="right" @change="handleSearch" />
+            <span class="range-sep">至</span>
+            <el-input-number v-model="priceMax" :min="0" :max="9999" controls-position="right" @change="handleSearch" />
+            <span class="range-unit">元</span>
+          </div>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">排序方式</span>
+          <el-select v-model="sort" placeholder="默认排序" @change="handleSearch">
+            <el-option label="默认排序" value="" />
+            <el-option label="价格从低到高" value="priceAsc" />
+            <el-option label="价格从高到低" value="priceDesc" />
+          </el-select>
+        </div>
+        <span class="soft-chip">点击卡片查看详情并预约</span>
       </div>
-      <span class="soft-chip">点击卡片查看详情并预约</span>
+      <div class="filter-actions">
+        <el-input
+          class="search-input"
+          v-model="keyword"
+          placeholder="搜索服务名称或描述"
+          clearable
+          @clear="handleSearch"
+          @keyup.enter="handleSearch"
+        >
+          <template #append>
+            <el-button @click="handleSearch">搜索</el-button>
+          </template>
+        </el-input>
+      </div>
     </section>
 
     <div v-if="loading" class="section-block surface-panel loading-panel">
@@ -72,7 +105,7 @@
         :page-size="pageSize"
         :total="total"
         layout="prev, pager, next"
-        @current-change="fetchServices"
+        @current-change="handlePageChange"
         background
       />
     </div>
@@ -131,7 +164,7 @@
           </el-form-item>
 
           <el-form-item label="预约时间" prop="appointmentTime">
-            <el-date-picker
+          <el-date-picker
               v-model="bookForm.appointmentTime"
               type="datetime"
               placeholder="请选择预约时间"
@@ -139,6 +172,7 @@
               format="YYYY-MM-DD HH:mm"
               value-format="YYYY-MM-DD HH:mm:ss"
               :disabled-date="disabledDate"
+              :disabled-time="disabledTime"
             />
           </el-form-item>
 
@@ -164,8 +198,8 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { createAppointment } from '@/api/appointment'
 import { getMyPets } from '@/api/pet'
@@ -173,6 +207,7 @@ import { getServicePage } from '@/api/service'
 import { getCosUrl } from '@/utils/request'
 import { createSvgPlaceholder } from '@/utils/placeholders'
 
+const route = useRoute()
 const router = useRouter()
 const services = ref([])
 const total = ref(0)
@@ -180,6 +215,10 @@ const loading = ref(false)
 const currentType = ref(null)
 const page = ref(1)
 const pageSize = 9
+const keyword = ref('')
+const priceMin = ref(null)
+const priceMax = ref(null)
+const sort = ref('')
 
 const showDetail = ref(false)
 const currentService = ref(null)
@@ -222,11 +261,44 @@ const setImageFallback = (event, fallback) => {
   }
 }
 
-const disabledDate = (date) => date.getTime() < Date.now() - 86400000
+const getStartOfToday = () => {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+}
+
+const disabledDate = (date) => date.getTime() < getStartOfToday()
+
+const disabledTime = (date) => {
+  if (!date) return {}
+  const now = new Date()
+  const isSameDay = date.toDateString() === now.toDateString()
+  if (!isSameDay) return {}
+
+  const currentHour = now.getHours()
+  const currentMinute = now.getMinutes()
+  return {
+    disabledHours: () => Array.from({ length: currentHour }, (_, i) => i),
+    disabledMinutes: (hour) => (hour === currentHour ? Array.from({ length: currentMinute + 1 }, (_, i) => i) : []),
+    disabledSeconds: () => []
+  }
+}
+
+const normalizePriceRange = () => {
+  if (priceMin.value !== null && priceMax.value !== null && priceMin.value > priceMax.value) {
+    const temp = priceMin.value
+    priceMin.value = priceMax.value
+    priceMax.value = temp
+  }
+}
 
 const handleTypeChange = () => {
+  handleSearch()
+}
+
+const handleSearch = () => {
   page.value = 1
-  fetchServices()
+  normalizePriceRange()
+  syncQuery()
 }
 
 const fetchServices = async () => {
@@ -234,6 +306,10 @@ const fetchServices = async () => {
   try {
     const params = { page: page.value, pageSize }
     if (currentType.value) params.type = currentType.value
+    if (keyword.value) params.keyword = keyword.value
+    if (priceMin.value !== null && priceMin.value !== undefined) params.minPrice = priceMin.value
+    if (priceMax.value !== null && priceMax.value !== undefined) params.maxPrice = priceMax.value
+    if (sort.value) params.sort = sort.value
 
     const res = await getServicePage(params)
     if (res.code === 200) {
@@ -245,6 +321,36 @@ const fetchServices = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const handlePageChange = () => {
+  syncQuery()
+}
+
+const toNumber = (val) => {
+  if (val === undefined || val === null || val === '') return null
+  const num = Number(val)
+  return Number.isFinite(num) ? num : null
+}
+
+const applyQuery = (query) => {
+  currentType.value = toNumber(query.type)
+  page.value = toNumber(query.page) || 1
+  keyword.value = query.keyword || ''
+  priceMin.value = toNumber(query.minPrice)
+  priceMax.value = toNumber(query.maxPrice)
+  sort.value = query.sort || ''
+}
+
+const syncQuery = () => {
+  const query = {}
+  if (currentType.value) query.type = String(currentType.value)
+  if (keyword.value) query.keyword = keyword.value
+  if (priceMin.value !== null && priceMin.value !== undefined) query.minPrice = String(priceMin.value)
+  if (priceMax.value !== null && priceMax.value !== undefined) query.maxPrice = String(priceMax.value)
+  if (sort.value) query.sort = sort.value
+  if (page.value && page.value > 1) query.page = String(page.value)
+  router.replace({ query })
 }
 
 const openDetail = (service) => {
@@ -303,7 +409,14 @@ const handleBook = async () => {
   }
 }
 
-onMounted(fetchServices)
+watch(
+  () => route.query,
+  (query) => {
+    applyQuery(query)
+    fetchServices()
+  },
+  { immediate: true }
+)
 </script>
 
 <style scoped>
@@ -350,10 +463,20 @@ onMounted(fetchServices)
 .list-filter-panel {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  padding: 22px 26px;
-  border-radius: 22px;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 18px 20px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(232, 240, 252, 0.72), rgba(255, 255, 255, 0.98));
+  border: 1px solid rgba(65, 90, 130, 0.08);
+  box-shadow: 0 18px 36px rgba(37, 54, 74, 0.06);
+}
+
+.filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 18px;
+  flex: 1;
 }
 
 .filter-row {
@@ -361,12 +484,79 @@ onMounted(fetchServices)
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+  padding: 6px 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(65, 90, 130, 0.08);
+}
+
+.range-inputs {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.range-sep,
+.range-unit {
+  font-size: 12px;
+  color: var(--ink-muted);
 }
 
 .filter-label {
   color: var(--ink-body);
   font-size: 14px;
   font-weight: 700;
+}
+
+.filter-actions {
+  min-width: 280px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.filter-actions :deep(.el-input__inner) {
+  min-width: 240px;
+}
+
+.search-input {
+  width: 100%;
+  max-width: 360px;
+}
+
+.search-input :deep(.el-input__wrapper) {
+  border-radius: 999px;
+  border: 1px solid rgba(65, 90, 130, 0.15);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+}
+
+.search-input :deep(.el-input-group__append) {
+  border: none !important;
+  border-left: none !important;
+  padding: 0;
+  background: transparent;
+  box-shadow: none !important;
+  display: flex;
+  align-items: center;
+}
+
+.search-input :deep(.el-input-group__append .el-button) {
+  height: 36px;
+  margin: 4px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: none !important;
+  color: #fff;
+  background: linear-gradient(135deg, #4e79be, #6a8fcb);
+  box-shadow: 0 8px 18px rgba(78, 121, 190, 0.28);
+}
+
+.search-input :deep(.el-input-group__append .el-button:hover) {
+  filter: brightness(0.96);
+}
+
+.search-input :deep(.el-input__inner) {
+  height: 40px;
 }
 
 .loading-panel,
@@ -549,6 +739,11 @@ onMounted(fetchServices)
   .list-filter-panel {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .filter-actions {
+    width: 100%;
+    min-width: 0;
   }
 }
 

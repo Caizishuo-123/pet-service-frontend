@@ -46,8 +46,9 @@
               </div>
               <p class="pet-meta">{{ pet.breed || '品种待补充' }} · {{ pet.gender === 1 ? '公' : '母' }}</p>
               <div class="pet-meta-row">
-                <span>健康：{{ healthLabel(pet.healthStatus) }}</span>
+                <span>健康：{{ pet.source === 2 ? healthSummary(pet.healthStatus) : healthLabel(pet.healthStatus) }}</span>
                 <span>状态：{{ statusLabel(pet.status) }}</span>
+                <span>来源：{{ sourceLabel(pet.source) }}</span>
               </div>
               <div class="pet-card-actions">
                 <el-button type="primary" text size="small" @click="openForm(pet)">编辑</el-button>
@@ -100,7 +101,24 @@
           </el-select>
         </el-form-item>
         <el-form-item label="图片" prop="image">
-          <el-input v-model="form.image" placeholder="图片 URL（选填）" />
+          <el-upload
+            class="pet-image-uploader"
+            action="/api/cos/upload?type=pet"
+            :headers="uploadHeaders"
+            :show-file-list="false"
+            :on-success="handleImageSuccess"
+            :on-error="handleImageError"
+            :before-upload="beforeImageUpload"
+          >
+            <img v-if="form.image" :src="getCosUrl(form.image)" class="pet-image" />
+            <div v-else class="pet-upload-placeholder">
+              <el-icon class="pet-upload-icon">
+                <Plus />
+              </el-icon>
+              <span>添加图片</span>
+            </div>
+          </el-upload>
+          <div class="upload-tip">支持 JPG/PNG/WEBP 格式，不超过 5MB</div>
         </el-form-item>
         <el-form-item label="描述" prop="description">
           <el-input v-model="form.description" type="textarea" :rows="3" placeholder="描述一下宠物的性格、特点（选填）" maxlength="500"
@@ -118,9 +136,10 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { getMyPets, addPet, updatePet, deletePet } from '@/api/pet'
 import { getCosUrl } from '@/utils/request'
+import { getHealthStatusSummary } from '@/utils/healthStatus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 
@@ -154,6 +173,37 @@ const formRules = {
   healthStatus: [{ required: true, message: '请选择健康状态', trigger: 'change' }]
 }
 
+const uploadHeaders = computed(() => {
+  const token = localStorage.getItem('token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+})
+
+const handleImageSuccess = (response) => {
+  if (response?.code === 200) {
+    form.image = response.data
+    ElMessage.success('上传成功')
+  } else {
+    ElMessage.error('上传失败: ' + (response?.message || response?.msg || '未知错误'))
+  }
+}
+
+const handleImageError = () => {
+  ElMessage.error('上传失败，请稍后重试')
+}
+
+const beforeImageUpload = (rawFile) => {
+  const isValidFormat = rawFile.type === 'image/jpeg' || rawFile.type === 'image/png' || rawFile.type === 'image/webp'
+  const isLt5M = rawFile.size / 1024 / 1024 < 5
+
+  if (!isValidFormat) {
+    ElMessage.error('上传图片只能是 JPG/PNG/WEBP 格式!')
+  }
+  if (!isLt5M) {
+    ElMessage.error('上传图片大小不能超过 5MB!')
+  }
+  return isValidFormat && isLt5M
+}
+
 const statusLabel = (s) => {
   const map = { 1: '正常', 2: '待领养', 3: '已领养' }
   return map[s] || '未知'
@@ -167,6 +217,16 @@ const statusTagType = (s) => {
 const healthLabel = (h) => {
   const map = { 1: '健康', 2: '亚健康', 3: '生病', 4: '残疾' }
   return map[h] || '未知'
+}
+
+const healthSummary = (status) => {
+  const summary = getHealthStatusSummary(status)
+  return summary || '状态待更新'
+}
+
+const sourceLabel = (source) => {
+  const map = { 1: '自有', 2: '领养' }
+  return map[source] || '未知'
 }
 
 const fetchPets = async () => {
@@ -304,6 +364,57 @@ onMounted(() => fetchPets())
   color: var(--ink-body);
 }
 
+/* ========== Upload ========== */
+.pet-image-uploader :deep(.el-upload) {
+  width: 140px;
+  height: 140px;
+  border-radius: 16px;
+  border: 1px dashed var(--line-soft);
+  background: var(--surface-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.pet-image-uploader :deep(.el-upload:hover) {
+  border-color: var(--brand-strong);
+  background: #fff;
+  box-shadow: 0 10px 22px rgba(37, 54, 74, 0.08);
+}
+
+.pet-image {
+  width: 140px;
+  height: 140px;
+  object-fit: cover;
+  border-radius: 14px;
+  display: block;
+}
+
+.pet-upload-placeholder {
+  width: 140px;
+  height: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.pet-upload-icon {
+  font-size: 24px;
+  color: var(--ink-muted);
+}
+
+.upload-tip {
+  margin-top: 8px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
 /* ========== Pet Cards ========== */
 .pet-grid {
   margin-top: 8px;
@@ -423,6 +534,7 @@ onMounted(() => fetchPets())
   gap: 8px;
   color: var(--ink-muted);
   font-size: 12px;
+  flex-wrap: wrap;
 }
 
 .pet-card-actions {

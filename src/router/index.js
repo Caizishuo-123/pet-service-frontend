@@ -86,6 +86,18 @@ const routes = [
         meta: { title: '我的订单', requiresAuth: true }
       },
       {
+        path: 'my-adoptions',
+        name: 'MyAdoptions',
+        component: () => import('@/views/MyAdoptions.vue'),
+        meta: { title: '我的领养', requiresAuth: true }
+      },
+      {
+        path: 'my-posts',
+        name: 'MyPosts',
+        component: () => import('@/views/MyPosts.vue'),
+        meta: { title: '我的帖子', requiresAuth: true }
+      },
+      {
         path: 'checkout',
         name: 'Checkout',
         component: () => import('@/views/Checkout.vue'),

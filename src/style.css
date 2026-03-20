@@ -156,6 +156,18 @@ select {
   font-weight: 700;
 }
 
+.notice-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(243, 208, 169, 0.35);
+  color: #9a6b2f;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .card-grid-4,
 .card-grid-3 {
   display: grid;

@@ -16,6 +16,9 @@
           <el-tag :type="postTypeTag(post.type)" size="small" effect="plain">
             {{ postTypeLabel(post.type) }}
           </el-tag>
+          <el-tag v-if="post.type === 1" size="small" effect="plain" class="post-category-tag">
+            {{ postCategoryLabel(post.category ?? post.type) }}
+          </el-tag>
           <h1 class="post-title">{{ post.title }}</h1>
         </div>
 
@@ -138,12 +141,17 @@ const isMyComment = (c) => {
 }
 
 const postTypeLabel = (t) => {
-  const map = { 1: '📸 晒宠', 2: '❓ 求助', 3: '📖 科普' }
-  return map[t] || '其他'
+  const map = { 1: '普通', 2: '公告' }
+  return map[t] || '帖子'
+}
+
+const postCategoryLabel = (category) => {
+  const map = { 1: '分享', 2: '求助', 3: '科普', 4: '讨论', 5: '其他' }
+  return map[category] || '其他'
 }
 
 const postTypeTag = (t) => {
-  const map = { 1: 'warning', 2: 'danger', 3: 'success' }
+  const map = { 1: 'info', 2: 'danger' }
   return map[t] || 'info'
 }
 
@@ -310,6 +318,10 @@ onMounted(() => {
   align-items: center;
   gap: 10px;
   margin-bottom: 16px;
+}
+
+.post-category-tag {
+  margin-left: 4px;
 }
 
 .post-title {
