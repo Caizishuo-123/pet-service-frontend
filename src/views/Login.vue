@@ -1,46 +1,58 @@
 <template>
-  <div class="login-page">
-    <div class="login-container">
-      <!-- 左侧装饰区 -->
-      <div class="login-banner">
-        <div class="banner-content">
-          <span class="banner-icon">🐾</span>
-          <h1>宠乐园</h1>
-          <p>您身边的宠物服务平台</p>
-          <p class="sub-text">领养 · 服务 · 社区</p>
+  <div class="auth-page">
+    <div class="auth-card login-card">
+      <section class="auth-brand">
+        <button class="brand-mini" type="button" @click="router.push('/home')">
+          <span class="brand-mark">宠</span>
+          <span>
+            <strong>宠物乐园</strong>
+            <small>宠物服务平台</small>
+          </span>
+        </button>
+        <div class="brand-copy">
+          <span class="page-kicker">欢迎回来</span>
+          <h1>登录你的账号</h1>
+          <p>可管理宠物、预约服务、查看领养进度和订单</p>
         </div>
-      </div>
+        <div class="brand-tags">
+          <span>领养申请</span>
+          <span>服务预约</span>
+          <span>社区互动</span>
+        </div>
+      </section>
 
-      <!-- 右侧表单区 -->
-      <div class="login-form-wrapper">
+      <section class="auth-form-panel">
         <div class="form-header">
-          <h2>欢迎登录</h2>
-          <p>请输入您的账号和密码</p>
+          <h2>账号登录</h2>
+          <p>请输入用户名、手机号或邮箱登录</p>
         </div>
 
-        <el-form ref="formRef" :model="form" :rules="rules" size="large">
+        <el-form ref="formRef" :model="form" :rules="rules" size="large" class="auth-form">
           <el-form-item prop="account">
-            <el-input v-model="form.account" placeholder="用户名 / 邮箱" prefix-icon="User" />
+            <el-input v-model="form.account" placeholder="用户名 / 手机号 / 邮箱" prefix-icon="User" />
           </el-form-item>
 
           <el-form-item prop="password">
-            <el-input v-model="form.password" type="password" placeholder="密码" prefix-icon="Lock" show-password
-              @keyup.enter="handleLogin" />
+            <el-input
+              v-model="form.password"
+              type="password"
+              placeholder="密码"
+              prefix-icon="Lock"
+              show-password
+              @keyup.enter="handleLogin"
+            />
           </el-form-item>
 
-          <el-form-item>
-            <el-button type="primary" :loading="loading" class="login-btn" @click="handleLogin">
-              登 录
-            </el-button>
-          </el-form-item>
+          <el-button type="primary" :loading="loading" class="submit-btn" @click="handleLogin">
+            登录
+          </el-button>
         </el-form>
 
         <div class="form-footer">
           <router-link to="/forgot-password" class="link">忘记密码？</router-link>
-          <span class="divider">|</span>
-          <router-link to="/register" class="link">没有账号？立即注册</router-link>
+          <router-link to="/register" class="link strong">没有账号，立即注册</router-link>
         </div>
-      </div>
+      </section>
     </div>
   </div>
 </template>
@@ -64,7 +76,7 @@ const form = reactive({
 })
 
 const rules = {
-  account: [{ required: true, message: '请输入用户名或邮箱', trigger: 'blur' }],
+  account: [{ required: true, message: '请输入用户名、手机号或邮箱', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
 }
 
@@ -77,8 +89,7 @@ const handleLogin = async () => {
     const res = await login(form.account, form.password)
     if (res.code === 200) {
       userStore.setLoginData(res.data)
-      ElMessage.success('登录成功')
-      // 跳转到之前被拦截的页面，或首页
+      ElMessage.success(route.query.expired ? '登录成功，已恢复访问' : '登录成功')
       const redirect = route.query.redirect || '/home'
       router.push(redirect)
     } else {
@@ -93,111 +104,181 @@ const handleLogin = async () => {
 </script>
 
 <style scoped>
-.login-page {
+.auth-page {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #ffffff;
+  padding: 48px 24px;
+  background:
+    radial-gradient(circle at 12% 16%, rgba(95, 136, 198, 0.14), transparent 26%),
+    linear-gradient(180deg, #f8fafc 0%, #eef3fa 100%);
 }
 
-.login-container {
-  display: flex;
-  width: 800px;
-  min-height: 460px;
-  background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
-  border: 1px solid #ebeef5;
+.auth-card {
+  width: min(980px, 100%);
+  display: grid;
+  grid-template-columns: 0.95fr 1.05fr;
   overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid rgba(37, 54, 74, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 24px 70px rgba(37, 54, 74, 0.12);
 }
 
-.login-banner {
-  width: 340px;
-  background: linear-gradient(135deg, #409EFF 0%, #66b1ff 100%);
+.login-card {
+  min-height: 520px;
+}
+
+.auth-brand {
+  position: relative;
   display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 36px;
+  background: linear-gradient(180deg, #eef5ff 0%, #f8fbff 100%);
+}
+
+.brand-mini {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  border: none;
+  background: transparent;
+  color: #25364a;
+  cursor: pointer;
+}
+
+.brand-mark {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: #dbe7f6;
+  color: #34527d;
+  font-weight: 800;
 }
 
-.banner-content {
-  text-align: center;
-  padding: 40px;
-}
-
-.banner-icon {
-  font-size: 64px;
+.brand-mini strong,
+.brand-mini small {
   display: block;
-  margin-bottom: 16px;
+  text-align: left;
 }
 
-.banner-content h1 {
-  font-size: 32px;
+.brand-mini strong {
+  font-size: 20px;
+}
+
+.brand-mini small {
+  margin-top: 3px;
+  color: #8b96a5;
+  font-size: 12px;
+}
+
+.brand-copy {
+  position: relative;
+  z-index: 1;
+}
+
+.brand-copy h1 {
+  margin: 18px 0 12px;
+  color: #25364a;
+  font-size: 34px;
+  line-height: 1.18;
+}
+
+.brand-copy p {
+  margin: 0;
+  max-width: 360px;
+  color: #5d6a7d;
+  line-height: 1.8;
+}
+
+.page-kicker {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(95, 136, 198, 0.14);
+  color: #446da9;
+  font-size: 12px;
   font-weight: 700;
-  margin-bottom: 12px;
 }
 
-.banner-content p {
-  font-size: 16px;
-  opacity: 0.9;
+.brand-tags {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
-.sub-text {
-  margin-top: 8px;
-  font-size: 14px !important;
-  opacity: 0.7 !important;
-  letter-spacing: 4px;
+.brand-tags span {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #fff;
+  color: #5d6a7d;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 10px 24px rgba(37, 54, 74, 0.06);
 }
 
-.login-form-wrapper {
-  flex: 1;
-  padding: 48px 40px;
+.auth-form-panel {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  padding: 48px 52px;
 }
 
 .form-header {
-  margin-bottom: 32px;
+  margin-bottom: 28px;
 }
 
 .form-header h2 {
-  font-size: 24px;
-  font-weight: 700;
-  color: #1f2937;
-  margin-bottom: 8px;
+  margin: 0 0 8px;
+  color: #25364a;
+  font-size: 28px;
 }
 
 .form-header p {
+  margin: 0;
+  color: #8b96a5;
   font-size: 14px;
-  color: #9ca3af;
 }
 
-.login-btn {
+.auth-form :deep(.el-input__wrapper) {
+  border-radius: 12px;
+}
+
+.submit-btn {
   width: 100%;
   height: 44px;
+  margin-top: 4px;
+  border-radius: 999px;
   font-size: 16px;
-  border-radius: 8px;
+  font-weight: 700;
 }
 
 .form-footer {
-  text-align: center;
-  margin-top: 16px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 20px;
 }
 
-.form-footer .link {
-  color: #409EFF;
+.link {
+  color: #5d6a7d;
   font-size: 14px;
   text-decoration: none;
 }
 
-.form-footer .link:hover {
-  text-decoration: underline;
-}
-
-.form-footer .divider {
-  margin: 0 12px;
-  color: #d1d5db;
+.link:hover,
+.link.strong {
+  color: #446da9;
 }
 </style>

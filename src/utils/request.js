@@ -1,8 +1,11 @@
 import axios from 'axios'
 import router from '@/router'
+import { ElMessage } from 'element-plus'
 
-// COS 存储桶域名（与管理端一致）
-export const COS_BASE_URL = 'https://cthulhu-1400035022.cos.ap-guangzhou.myqcloud.com'
+const RAW_COS_BASE_URL = import.meta.env.VITE_COS_BASE_URL || 'https://cthulhu-1400035022.cos.ap-guangzhou.myqcloud.com'
+
+// COS 存储桶域名（可通过 VITE_COS_BASE_URL 配置）
+export const COS_BASE_URL = RAW_COS_BASE_URL.replace(/\/+$/, '')
 
 /**
  * 获取 COS 图片完整 URL
@@ -41,7 +44,17 @@ request.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('token')
       localStorage.removeItem('userInfo')
-      router.push('/login')
+      const currentPath = router.currentRoute.value.fullPath
+      if (router.currentRoute.value.path !== '/login') {
+        ElMessage.warning('登录已过期，请重新登录')
+        router.push({
+          path: '/login',
+          query: {
+            redirect: currentPath,
+            expired: '1'
+          }
+        })
+      }
     }
     return Promise.reject(error)
   }

@@ -34,10 +34,16 @@
             </div>
           </div>
           <div class="post-actions">
-            <el-button :type="liked ? 'danger' : 'default'" round size="small" @click="handleLike">
-              {{ liked ? '❤️' : '🤍' }} {{ post.likeCount || 0 }}
+            <el-button :type="liked ? 'primary' : 'default'" round size="small" @click="handleLike">
+              <el-icon><StarFilled /></el-icon>
+              {{ post.likeCount || 0 }}
+            </el-button>
+            <el-button v-if="isMyPost" type="primary" text size="small" @click="openEditDialog">
+              <el-icon><Edit /></el-icon>
+              编辑帖子
             </el-button>
             <el-button v-if="isMyPost" type="danger" text size="small" @click="handleDeletePost">
+              <el-icon><Delete /></el-icon>
               删除帖子
             </el-button>
           </div>
@@ -57,11 +63,14 @@
 
       <!-- 评论区 -->
       <div class="comment-section">
-        <h3 class="comment-title">💬 评论 ({{ commentTotal }})</h3>
+        <h3 class="comment-title">
+          <el-icon><ChatDotRound /></el-icon>
+          评论 ({{ commentTotal }})
+        </h3>
 
         <!-- 发表评论 -->
         <div class="comment-input-area">
-          <el-input v-model="commentText" type="textarea" :rows="3" placeholder="写下你的评论..." maxlength="500"
+          <el-input v-model="commentText" type="textarea" :rows="3" placeholder="写下你的评论..." maxlength="255"
             show-word-limit />
           <el-button type="primary" :loading="commenting" @click="handleAddComment" :disabled="!commentText.trim()"
             style="margin-top:8px;">
@@ -104,17 +113,57 @@
     <el-empty v-else-if="!loading" description="帖子不存在或已被删除" :image-size="120">
       <el-button type="primary" @click="router.push('/community')">返回社区</el-button>
     </el-empty>
+
+    <el-dialog v-model="editVisible" title="编辑帖子" width="560px" :close-on-click-modal="false">
+      <el-form ref="editFormRef" :model="editForm" :rules="editRules" label-width="80px">
+        <el-form-item label="分类" prop="category">
+          <el-radio-group v-model="editForm.category">
+            <el-radio :value="1">分享</el-radio>
+            <el-radio :value="2">求助</el-radio>
+            <el-radio :value="3">科普</el-radio>
+            <el-radio :value="4">讨论</el-radio>
+            <el-radio :value="5">其他</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="标题" prop="title">
+          <el-input v-model="editForm.title" maxlength="50" show-word-limit placeholder="请输入帖子标题" />
+        </el-form-item>
+        <el-form-item label="内容" prop="content">
+          <el-input v-model="editForm.content" type="textarea" :rows="6" maxlength="2000" show-word-limit placeholder="请输入帖子内容" />
+        </el-form-item>
+        <el-form-item label="图片">
+          <el-upload
+            class="post-image-uploader"
+            action="/api/cos/upload?type=post"
+            :headers="uploadHeaders"
+            :show-file-list="false"
+            :on-success="handleImageSuccess"
+            :on-error="handleImageError"
+            :before-upload="beforeImageUpload"
+          >
+            <img v-if="editForm.imageUrl" :src="getCosUrl(editForm.imageUrl)" class="edit-image" />
+            <div v-else class="edit-upload-placeholder">添加图片</div>
+          </el-upload>
+          <el-button v-if="editForm.imageUrl" size="small" text type="danger" @click="editForm.imageUrl = ''">移除图片</el-button>
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="editVisible = false">取消</el-button>
+        <el-button type="primary" :loading="editing" @click="handleUpdatePost">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getPostDetail, deletePost, getComments, addComment, deleteComment, toggleLike, getLikeStatus } from '@/api/post'
+import { getPostDetail, deletePost, getComments, addComment, deleteComment, toggleLike, getLikeStatus, updatePost } from '@/api/post'
 import { getCosUrl } from '@/utils/request'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft } from '@element-plus/icons-vue'
+import { ArrowLeft, StarFilled, ChatDotRound, Edit, Delete } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -131,13 +180,43 @@ const commentPage = ref(1)
 const commentPageSize = 10
 const commentText = ref('')
 const commenting = ref(false)
+const editVisible = ref(false)
+const editing = ref(false)
+const editFormRef = ref(null)
+
+const editForm = reactive({
+  id: null,
+  category: 1,
+  title: '',
+  content: '',
+  imageUrl: ''
+})
+
+const editRules = {
+  category: [{ required: true, message: '请选择分类', trigger: 'change' }],
+  title: [
+    { required: true, message: '请输入标题', trigger: 'blur' },
+    { min: 2, max: 50, message: '标题长度应为 2-50 个字符', trigger: 'blur' }
+  ],
+  content: [
+    { required: true, message: '请输入内容', trigger: 'blur' },
+    { min: 5, message: '内容至少 5 个字', trigger: 'blur' }
+  ]
+}
+
+const uploadHeaders = computed(() => {
+  const token = localStorage.getItem('token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+})
 
 const isMyPost = computed(() => {
-  return post.value?.username && userStore.username === post.value.username
+  return (post.value?.userId && userStore.userInfo?.userId === post.value.userId)
+    || (post.value?.username && userStore.username === post.value.username)
 })
 
 const isMyComment = (c) => {
-  return c.username && userStore.username === c.username
+  return (c.userId && userStore.userInfo?.userId === c.userId)
+    || (c.username && userStore.username === c.username)
 }
 
 const postTypeLabel = (t) => {
@@ -216,9 +295,7 @@ const handleLike = async () => {
     const res = await toggleLike(route.params.id)
     if (res.code === 200) {
       liked.value = !liked.value
-      if (post.value) {
-        post.value.likeCount = (post.value.likeCount || 0) + (liked.value ? 1 : -1)
-      }
+      await fetchPost()
     }
   } catch (e) {
     ElMessage.error('操作失败')
@@ -248,6 +325,64 @@ const handleAddComment = async () => {
     ElMessage.error(e.response?.data?.message || '评论失败')
   } finally {
     commenting.value = false
+  }
+}
+
+const openEditDialog = () => {
+  if (!post.value) return
+  editForm.id = post.value.id
+  editForm.category = post.value.category || 1
+  editForm.title = post.value.title || ''
+  editForm.content = post.value.content || ''
+  editForm.imageUrl = post.value.imageUrl || ''
+  editVisible.value = true
+}
+
+const handleImageSuccess = (response) => {
+  if (response?.code === 200) {
+    editForm.imageUrl = response.data
+    ElMessage.success('上传成功')
+  } else {
+    ElMessage.error(response?.message || '上传失败')
+  }
+}
+
+const handleImageError = () => {
+  ElMessage.error('上传失败，请稍后重试')
+}
+
+const beforeImageUpload = (rawFile) => {
+  const isValidFormat = rawFile.type === 'image/jpeg' || rawFile.type === 'image/png' || rawFile.type === 'image/webp'
+  const isLt5M = rawFile.size / 1024 / 1024 < 5
+  if (!isValidFormat) ElMessage.error('上传图片只能是 JPG/PNG/WEBP 格式')
+  if (!isLt5M) ElMessage.error('上传图片大小不能超过 5MB')
+  return isValidFormat && isLt5M
+}
+
+const handleUpdatePost = async () => {
+  const valid = await editFormRef.value?.validate().catch(() => false)
+  if (!valid) return
+
+  editing.value = true
+  try {
+    const res = await updatePost({
+      id: editForm.id,
+      category: editForm.category,
+      title: editForm.title,
+      content: editForm.content,
+      imageUrl: editForm.imageUrl || null
+    })
+    if (res.code === 200) {
+      ElMessage.success('帖子已更新')
+      editVisible.value = false
+      await fetchPost()
+    } else {
+      ElMessage.error(res.message || '更新失败')
+    }
+  } catch (e) {
+    ElMessage.error(e.response?.data?.message || '更新失败')
+  } finally {
+    editing.value = false
   }
 }
 
@@ -367,6 +502,12 @@ onMounted(() => {
   gap: 8px;
 }
 
+.post-actions :deep(.el-button) {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .post-image {
   border-radius: 12px;
   overflow: hidden;
@@ -396,10 +537,39 @@ onMounted(() => {
 }
 
 .comment-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 18px;
   font-weight: 700;
   color: #303133;
   margin-bottom: 20px;
+}
+
+.post-image-uploader :deep(.el-upload) {
+  width: 160px;
+  height: 108px;
+  border: 1px dashed #c9d6e6;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f7faff;
+}
+
+.edit-image {
+  width: 160px;
+  height: 108px;
+  object-fit: cover;
+  display: block;
+}
+
+.edit-upload-placeholder {
+  width: 160px;
+  height: 108px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #5d7fad;
+  font-size: 14px;
 }
 
 .comment-input-area {

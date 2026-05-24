@@ -10,6 +10,13 @@ export const createPost = (data) => {
 }
 
 /**
+ * ä¿®æ”¹å¸–å­
+ */
+export const updatePost = (data) => {
+  return request.put('/post/update', data)
+}
+
+/**
  * 帖子列表
  */
 export const getPostPage = (params) => {

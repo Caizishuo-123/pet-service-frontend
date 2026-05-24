@@ -1,25 +1,33 @@
 <template>
-  <div class="register-page">
-    <div class="register-container">
-      <!-- 左侧装饰区 -->
-      <div class="register-banner">
-        <div class="banner-content">
-          <span class="banner-icon">🐾</span>
-          <h1>宠乐园</h1>
-          <p>加入我们，开启宠物新生活</p>
-          <p class="sub-text">领养 · 服务 · 社区</p>
+  <div class="auth-page">
+    <div class="auth-card register-card">
+      <section class="auth-brand">
+        <button class="brand-mini" type="button" @click="router.push('/home')">
+          <span class="brand-mark">宠</span>
+          <span>
+            <strong>宠物乐园</strong>
+            <small>宠物服务平台</small>
+          </span>
+        </button>
+        <div class="brand-copy">
+          <span class="page-kicker">创建账号</span>
+          <h1>加入平台，开启你的养宠服务体验</h1>
+          <p>注册后可以提交领养申请、预约宠物服务，也可以在社区分享养宠经验。</p>
         </div>
-      </div>
+        <div class="brand-tags">
+          <span>邮箱验证</span>
+          <span>安全注册</span>
+          <span>快速使用</span>
+        </div>
+      </section>
 
-      <!-- 右侧表单区 -->
-      <div class="register-form-wrapper">
+      <section class="auth-form-panel">
         <div class="form-header">
           <h2>注册账号</h2>
           <p>通过邮箱验证码完成注册</p>
         </div>
 
-        <el-form ref="formRef" :model="form" :rules="rules" size="large" label-position="top">
-          <!-- 邮箱 + 验证码 -->
+        <el-form ref="formRef" :model="form" :rules="rules" size="large" label-position="top" class="auth-form">
           <el-form-item prop="email" label="邮箱">
             <el-input v-model="form.email" placeholder="请输入邮箱" />
           </el-form-item>
@@ -27,39 +35,45 @@
           <el-form-item prop="code" label="验证码">
             <div class="code-row">
               <el-input v-model="form.code" placeholder="请输入验证码" />
-              <el-button type="primary" :disabled="codeCooldown > 0" :loading="codeSending" @click="handleSendCode"
-                class="code-btn">
-                {{ codeCooldown > 0 ? `${codeCooldown}s` : '获取验证码' }}
+              <el-button
+                type="primary"
+                :disabled="codeCooldown > 0"
+                :loading="codeSending"
+                class="code-btn"
+                @click="handleSendCode"
+              >
+                {{ codeCooldown > 0 ? `${codeCooldown} 秒后重试` : '获取验证码' }}
               </el-button>
             </div>
           </el-form-item>
 
-          <!-- 用户名 -->
-          <el-form-item prop="username" label="用户名">
-            <el-input v-model="form.username" placeholder="请输入用户名" />
-          </el-form-item>
+          <div class="form-grid">
+            <el-form-item prop="username" label="用户名">
+              <el-input v-model="form.username" placeholder="请输入用户名" />
+            </el-form-item>
 
-          <!-- 手机号 -->
-          <el-form-item prop="phone" label="手机号">
-            <el-input v-model="form.phone" placeholder="请输入手机号" maxlength="11" />
-          </el-form-item>
+            <el-form-item prop="phone" label="手机号">
+              <el-input v-model="form.phone" placeholder="请输入手机号" maxlength="11" />
+            </el-form-item>
 
-          <!-- 密码 -->
-          <el-form-item prop="password" label="密码">
-            <el-input v-model="form.password" type="password" placeholder="请输入密码" show-password />
-          </el-form-item>
+            <el-form-item prop="password" label="密码">
+              <el-input v-model="form.password" type="password" placeholder="8-20 位，包含字母和数字" show-password />
+            </el-form-item>
 
-          <el-form-item>
-            <el-button type="primary" :loading="loading" class="register-btn" @click="handleRegister">
-              注 册
-            </el-button>
-          </el-form-item>
+            <el-form-item prop="confirmPassword" label="确认密码">
+              <el-input v-model="form.confirmPassword" type="password" placeholder="请再次输入密码" show-password />
+            </el-form-item>
+          </div>
+
+          <el-button type="primary" :loading="loading" class="submit-btn" @click="handleRegister">
+            注册
+          </el-button>
         </el-form>
 
         <div class="form-footer">
-          <router-link to="/login" class="link">已有账号？立即登录</router-link>
+          <router-link to="/login" class="link strong">已有账号，立即登录</router-link>
         </div>
-      </div>
+      </section>
     </div>
   </div>
 </template>
@@ -82,7 +96,8 @@ const form = reactive({
   code: '',
   username: '',
   phone: '',
-  password: ''
+  password: '',
+  confirmPassword: ''
 })
 
 const validatePhone = (rule, value, callback) => {
@@ -111,6 +126,16 @@ const validatePassword = (rule, value, callback) => {
   }
 }
 
+const validateConfirmPassword = (rule, value, callback) => {
+  if (!value) {
+    callback(new Error('请确认密码'))
+  } else if (value !== form.password) {
+    callback(new Error('两次输入的密码不一致'))
+  } else {
+    callback()
+  }
+}
+
 const rules = {
   email: [
     { required: true, message: '请输入邮箱', trigger: 'blur' },
@@ -122,12 +147,21 @@ const rules = {
     { min: 2, max: 20, message: '用户名长度为 2-20 个字符', trigger: 'blur' }
   ],
   phone: [{ required: true, validator: validatePhone, trigger: 'blur' }],
-  password: [{ required: true, validator: validatePassword, trigger: 'blur' }]
+  password: [{ required: true, validator: validatePassword, trigger: 'blur' }],
+  confirmPassword: [{ required: true, validator: validateConfirmPassword, trigger: 'blur' }]
 }
 
-// 发送验证码
+const startCooldown = () => {
+  codeCooldown.value = 60
+  cooldownTimer = setInterval(() => {
+    codeCooldown.value--
+    if (codeCooldown.value <= 0) {
+      clearInterval(cooldownTimer)
+    }
+  }, 1000)
+}
+
 const handleSendCode = async () => {
-  // 先校验邮箱字段
   try {
     await formRef.value.validateField('email')
   } catch {
@@ -139,14 +173,7 @@ const handleSendCode = async () => {
     const res = await sendCode(form.email)
     if (res.code === 200) {
       ElMessage.success('验证码已发送，请查收邮箱')
-      // 开始 60 秒倒计时
-      codeCooldown.value = 60
-      cooldownTimer = setInterval(() => {
-        codeCooldown.value--
-        if (codeCooldown.value <= 0) {
-          clearInterval(cooldownTimer)
-        }
-      }, 1000)
+      startCooldown()
     } else {
       ElMessage.error(res.message || '发送失败')
     }
@@ -157,7 +184,6 @@ const handleSendCode = async () => {
   }
 }
 
-// 注册
 const handleRegister = async () => {
   const valid = await formRef.value.validate().catch(() => false)
   if (!valid) return
@@ -165,7 +191,11 @@ const handleRegister = async () => {
   loading.value = true
   try {
     const res = await registerByEmail(
-      form.email, form.code, form.username, form.phone, form.password
+      form.email,
+      form.code,
+      form.username,
+      form.phone,
+      form.password
     )
     if (res.code === 200) {
       ElMessage.success('注册成功，请登录')
@@ -186,84 +216,164 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.register-page {
+.auth-page {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #ffffff;
+  padding: 48px 24px;
+  background:
+    radial-gradient(circle at 12% 16%, rgba(95, 136, 198, 0.14), transparent 26%),
+    linear-gradient(180deg, #f8fafc 0%, #eef3fa 100%);
 }
 
-.register-container {
-  display: flex;
-  width: 860px;
-  background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
-  border: 1px solid #ebeef5;
+.auth-card {
+  width: min(1080px, 100%);
+  display: grid;
+  grid-template-columns: 0.82fr 1.18fr;
   overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid rgba(37, 54, 74, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 24px 70px rgba(37, 54, 74, 0.12);
 }
 
-.register-banner {
-  width: 300px;
-  background: linear-gradient(135deg, #409EFF 0%, #66b1ff 100%);
+.register-card {
+  min-height: 560px;
+}
+
+.auth-brand {
+  position: relative;
   display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 36px;
+  background: linear-gradient(180deg, #eef5ff 0%, #f8fbff 100%);
+}
+
+.brand-mini {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  border: none;
+  background: transparent;
+  color: #25364a;
+  cursor: pointer;
+}
+
+.brand-mark {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: #dbe7f6;
+  color: #34527d;
+  font-weight: 800;
 }
 
-.banner-content {
-  text-align: center;
-  padding: 40px;
-}
-
-.banner-icon {
-  font-size: 64px;
+.brand-mini strong,
+.brand-mini small {
   display: block;
-  margin-bottom: 16px;
+  text-align: left;
 }
 
-.banner-content h1 {
+.brand-mini strong {
+  font-size: 20px;
+}
+
+.brand-mini small {
+  margin-top: 3px;
+  color: #8b96a5;
+  font-size: 12px;
+}
+
+.brand-copy {
+  position: relative;
+  z-index: 1;
+}
+
+.brand-copy h1 {
+  margin: 18px 0 12px;
+  color: #25364a;
   font-size: 32px;
+  line-height: 1.18;
+}
+
+.brand-copy p {
+  margin: 0;
+  max-width: 360px;
+  color: #5d6a7d;
+  line-height: 1.8;
+}
+
+.page-kicker {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(95, 136, 198, 0.14);
+  color: #446da9;
+  font-size: 12px;
   font-weight: 700;
-  margin-bottom: 12px;
 }
 
-.banner-content p {
-  font-size: 16px;
-  opacity: 0.9;
+.brand-tags {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
-.sub-text {
-  margin-top: 8px;
-  font-size: 14px !important;
-  opacity: 0.7 !important;
-  letter-spacing: 4px;
+.brand-tags span {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #fff;
+  color: #5d6a7d;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 10px 24px rgba(37, 54, 74, 0.06);
 }
 
-.register-form-wrapper {
-  flex: 1;
-  padding: 36px 40px;
-  overflow-y: auto;
-  max-height: 90vh;
+.auth-form-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 38px 48px;
 }
 
 .form-header {
-  margin-bottom: 24px;
+  margin-bottom: 22px;
 }
 
 .form-header h2 {
-  font-size: 24px;
-  font-weight: 700;
-  color: #1f2937;
-  margin-bottom: 8px;
+  margin: 0 0 8px;
+  color: #25364a;
+  font-size: 28px;
 }
 
 .form-header p {
+  margin: 0;
+  color: #8b96a5;
   font-size: 14px;
-  color: #9ca3af;
+}
+
+.auth-form :deep(.el-form-item) {
+  margin-bottom: 16px;
+}
+
+.auth-form :deep(.el-form-item__label) {
+  font-weight: 700;
+  color: #5d6a7d;
+}
+
+.auth-form :deep(.el-input__wrapper) {
+  border-radius: 12px;
 }
 
 .code-row {
@@ -277,29 +387,39 @@ onUnmounted(() => {
 }
 
 .code-btn {
-  width: 120px;
+  width: 132px;
   flex-shrink: 0;
+  border-radius: 12px;
 }
 
-.register-btn {
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 16px;
+}
+
+.submit-btn {
   width: 100%;
   height: 44px;
+  margin-top: 2px;
+  border-radius: 999px;
   font-size: 16px;
-  border-radius: 8px;
+  font-weight: 700;
 }
 
 .form-footer {
+  margin-top: 18px;
   text-align: center;
-  margin-top: 12px;
 }
 
-.form-footer .link {
-  color: #409EFF;
+.link {
+  color: #5d6a7d;
   font-size: 14px;
   text-decoration: none;
 }
 
-.form-footer .link:hover {
-  text-decoration: underline;
+.link:hover,
+.link.strong {
+  color: #446da9;
 }
 </style>

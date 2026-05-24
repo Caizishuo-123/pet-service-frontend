@@ -18,14 +18,19 @@
         <aside class="profile-aside surface-panel">
           <el-upload
             class="avatar-uploader"
+            v-loading="avatarUploading"
             action="/api/user/update-avatar"
             :headers="uploadHeaders"
+            :disabled="avatarUploading"
             :show-file-list="false"
             :on-success="handleAvatarSuccess"
             :on-error="handleAvatarError"
             :before-upload="beforeAvatarUpload"
           >
-            <img v-if="userInfo.avatar" :src="getCosUrl(userInfo.avatar)" class="avatar-image" />
+            <div v-if="userInfo.avatar" class="avatar-image-wrap">
+              <img :src="getCosUrl(userInfo.avatar)" class="avatar-image" />
+              <span class="avatar-hover-tip">点击更换头像</span>
+            </div>
             <div v-else class="avatar-placeholder">
               <el-icon class="avatar-icon">
                 <Plus />
@@ -131,6 +136,7 @@ import { Plus } from '@element-plus/icons-vue'
 const userStore = useUserStore()
 const userInfo = ref(null)
 const loading = ref(true)
+const avatarUploading = ref(false)
 
 // 编辑地址
 const editingAddress = ref(false)
@@ -204,6 +210,7 @@ const fetchUserInfo = async () => {
 
 // ===== 头像上传 =====
 const handleAvatarSuccess = (response) => {
+  avatarUploading.value = false
   if (response?.code === 200) {
     ElMessage.success('头像更新成功')
     userInfo.value.avatar = response.data
@@ -214,6 +221,7 @@ const handleAvatarSuccess = (response) => {
 }
 
 const handleAvatarError = () => {
+  avatarUploading.value = false
   ElMessage.error('上传失败，请稍后重试')
 }
 
@@ -227,7 +235,11 @@ const beforeAvatarUpload = (rawFile) => {
   if (!isLt5M) {
     ElMessage.error('上传图片大小不能超过 5MB!')
   }
-  return isValidFormat && isLt5M
+  const valid = isValidFormat && isLt5M
+  if (valid) {
+    avatarUploading.value = true
+  }
+  return valid
 }
 
 // ===== 编辑地址 =====
@@ -247,6 +259,7 @@ const saveAddress = async () => {
     if (res.code === 200) {
       ElMessage.success('地址已更新')
       userInfo.value.address = addressInput.value
+      userStore.updateUserInfo({ address: addressInput.value })
       editingAddress.value = false
     } else {
       ElMessage.error(res.message || '更新失败')
@@ -374,6 +387,29 @@ onUnmounted(() => { if (cooldownTimer) clearInterval(cooldownTimer) })
   object-fit: cover;
   border-radius: 22px;
   display: block;
+}
+
+.avatar-image-wrap {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  overflow: hidden;
+  border-radius: 22px;
+}
+
+.avatar-hover-tip {
+  position: absolute;
+  inset: auto 0 0;
+  padding: 8px 6px;
+  color: #fff;
+  font-size: 12px;
+  background: rgba(37, 54, 74, 0.62);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.avatar-uploader :deep(.el-upload:hover) .avatar-hover-tip {
+  opacity: 1;
 }
 
 .avatar-placeholder {

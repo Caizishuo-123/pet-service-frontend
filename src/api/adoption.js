@@ -20,3 +20,10 @@ export const getMyApplies = (params) => {
 export const getApplyDetail = (id) => {
   return request.get(`/adoption/detail/${id}`)
 }
+
+/**
+ * å–æ¶ˆå¾…å®¡æ ¸çš„é¢†å…»ç”³è¯·
+ */
+export const cancelApply = (id) => {
+  return request.put(`/adoption/cancel/${id}`)
+}

@@ -4,7 +4,7 @@
       <div>
         <span class="page-kicker">Pet Service</span>
         <h1 class="page-title">宠物服务</h1>
-        <p class="page-desc">页面结构和领养大厅保持一致：先看说明，再筛选，再浏览规整卡片，最后进入详情或预约。</p>
+        <!-- <p class="page-desc">预约美容、洗护、医疗、寄养等宠物服务，选择合适时间后即可在线下单。</p> -->
       </div>
       <div class="hero-summary-grid">
         <article class="hero-summary-card">
@@ -12,7 +12,7 @@
           <span>服务项目数量</span>
         </article>
         <article class="hero-summary-card">
-          <strong>4</strong>
+          <strong>6</strong>
           <span>服务分类</span>
         </article>
       </div>
@@ -22,13 +22,10 @@
       <div class="filter-group">
         <div class="filter-row">
           <span class="filter-label">服务类型</span>
-          <el-radio-group v-model="currentType" @change="handleTypeChange">
-            <el-radio-button :value="null">全部</el-radio-button>
-            <el-radio-button :value="1">洗护</el-radio-button>
-            <el-radio-button :value="2">美容</el-radio-button>
-            <el-radio-button :value="3">医疗</el-radio-button>
-            <el-radio-button :value="4">寄养</el-radio-button>
-          </el-radio-group>
+          <el-select v-model="currentType" class="type-select" placeholder="全部类型" clearable @change="handleTypeChange">
+            <el-option label="全部类型" :value="null" />
+            <el-option v-for="item in serviceTypes" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
         </div>
         <div class="filter-row">
           <span class="filter-label">价格区间</span>
@@ -41,13 +38,12 @@
         </div>
         <div class="filter-row">
           <span class="filter-label">排序方式</span>
-          <el-select v-model="sort" placeholder="默认排序" @change="handleSearch">
+          <el-select v-model="sort" class="sort-select" placeholder="默认排序" @change="handleSearch">
             <el-option label="默认排序" value="" />
             <el-option label="价格从低到高" value="priceAsc" />
             <el-option label="价格从高到低" value="priceDesc" />
           </el-select>
         </div>
-        <span class="soft-chip">点击卡片查看详情并预约</span>
       </div>
       <div class="filter-actions">
         <el-input
@@ -86,11 +82,15 @@
               <h3>{{ svc.name }}</h3>
               <strong class="price-text">¥{{ svc.price }}</strong>
             </div>
-            <p class="list-card-note">{{ typeLabel(svc.type) }}</p>
-            <p class="list-card-desc">{{ truncate(svc.description || '支持在线预约，适合展示完整的服务流程。', 48) }}</p>
-            <div class="list-card-meta-row">
+            <div class="service-facts-row">
+              <span>{{ typeLabel(svc.type) }}</span>
               <span>{{ svc.duration ? `${svc.duration} 分钟` : '时长待确认' }}</span>
+              <span>{{ svc.contactPhone || '电话待确认' }}</span>
+            </div>
+            <p class="list-card-desc">{{ svc.description || '可在线预约，服务人员会按预约时间为宠物提供照护。' }}</p>
+            <div class="list-card-meta-row">
               <span>查看详情</span>
+              <span>立即预约</span>
             </div>
           </div>
         </article>
@@ -110,83 +110,92 @@
       />
     </div>
 
-    <el-dialog v-model="showDetail" :title="currentService?.name" width="560px" :close-on-click-modal="false">
-      <div v-if="currentService" class="detail-panel">
-        <div class="detail-media">
-          <img
-            v-if="currentService.imageUrl"
-            :src="getCosUrl(currentService.imageUrl)"
-            :alt="currentService.name"
-            @error="setImageFallback($event, servicePlaceholder)"
-          />
-          <div v-else class="detail-placeholder">{{ typeLabel(currentService.type) }}</div>
-        </div>
-
-        <div class="detail-grid">
-          <div class="detail-item">
-            <span>服务类型</span>
-            <strong>{{ typeLabel(currentService.type) }}</strong>
-          </div>
-          <div class="detail-item">
-            <span>价格</span>
-            <strong class="price">¥{{ currentService.price }}</strong>
-          </div>
-          <div v-if="currentService.duration" class="detail-item">
-            <span>服务时长</span>
-            <strong>{{ currentService.duration }} 分钟</strong>
-          </div>
-          <div v-if="currentService.contactPhone" class="detail-item">
-            <span>联系电话</span>
-            <strong>{{ currentService.contactPhone }}</strong>
-          </div>
-        </div>
-
-        <p v-if="currentService.description" class="detail-desc">{{ currentService.description }}</p>
-
-        <el-divider>预约信息</el-divider>
-
-        <el-form ref="bookFormRef" :model="bookForm" :rules="bookRules" label-width="88px">
-          <el-form-item label="选择宠物" prop="petId">
-            <el-select
-              v-model="bookForm.petId"
-              placeholder="请选择您的宠物"
-              style="width: 100%"
-              :loading="petsLoading"
-              @focus="loadMyPets"
-            >
-              <el-option v-for="pet in myPets" :key="pet.id" :label="pet.name" :value="pet.id">
-                <span>{{ pet.name }}（{{ pet.breed || '未知品种' }}）</span>
-              </el-option>
-              <template #empty>
-                <div class="select-empty">暂无宠物，请先到“我的宠物”页面添加</div>
-              </template>
-            </el-select>
-          </el-form-item>
-
-          <el-form-item label="预约时间" prop="appointmentTime">
-          <el-date-picker
-              v-model="bookForm.appointmentTime"
-              type="datetime"
-              placeholder="请选择预约时间"
-              style="width: 100%"
-              format="YYYY-MM-DD HH:mm"
-              value-format="YYYY-MM-DD HH:mm:ss"
-              :disabled-date="disabledDate"
-              :disabled-time="disabledTime"
+    <el-dialog
+      v-model="showDetail"
+      :title="currentService?.name"
+      width="760px"
+      class="service-book-dialog"
+      :close-on-click-modal="false"
+    >
+      <div v-if="currentService" class="detail-panel detail-panel-split">
+        <section class="detail-info-column">
+          <div class="detail-media">
+            <img
+              v-if="currentService.imageUrl"
+              :src="getCosUrl(currentService.imageUrl)"
+              :alt="currentService.name"
+              @error="setImageFallback($event, servicePlaceholder)"
             />
-          </el-form-item>
+            <div v-else class="detail-placeholder">{{ typeLabel(currentService.type) }}</div>
+          </div>
 
-          <el-form-item label="备注" prop="remark">
-            <el-input
-              v-model="bookForm.remark"
-              type="textarea"
-              :rows="3"
-              maxlength="200"
-              show-word-limit
-              placeholder="可填写特殊需求，选填"
-            />
-          </el-form-item>
-        </el-form>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span>服务类型</span>
+              <strong>{{ typeLabel(currentService.type) }}</strong>
+            </div>
+            <div class="detail-item">
+              <span>价格</span>
+              <strong class="price">¥{{ currentService.price }}</strong>
+            </div>
+            <div v-if="currentService.duration" class="detail-item">
+              <span>服务时长</span>
+              <strong>{{ currentService.duration }} 分钟</strong>
+            </div>
+            <div v-if="currentService.contactPhone" class="detail-item">
+              <span>联系电话</span>
+              <strong>{{ currentService.contactPhone }}</strong>
+            </div>
+          </div>
+
+          <p v-if="currentService.description" class="detail-desc">{{ currentService.description }}</p>
+        </section>
+
+        <section class="book-form-column">
+          <h3>预约信息</h3>
+          <el-form ref="bookFormRef" :model="bookForm" :rules="bookRules" label-position="top">
+            <el-form-item label="选择宠物" prop="petId">
+              <el-select
+                v-model="bookForm.petId"
+                placeholder="请选择您的宠物"
+                style="width: 100%"
+                :loading="petsLoading"
+                @focus="loadMyPets"
+              >
+                <el-option v-for="pet in myPets" :key="pet.id" :label="pet.name" :value="pet.id">
+                  <span>{{ pet.name }}（{{ pet.breed || '未知品种' }}）</span>
+                </el-option>
+                <template #empty>
+                  <div class="select-empty">暂无宠物，请先到“我的宠物”页面添加</div>
+                </template>
+              </el-select>
+            </el-form-item>
+
+            <el-form-item label="预约时间" prop="appointmentTime">
+              <el-date-picker
+                v-model="bookForm.appointmentTime"
+                type="datetime"
+                placeholder="请选择预约时间"
+                style="width: 100%"
+                format="YYYY-MM-DD HH:mm"
+                value-format="YYYY-MM-DD HH:mm:ss"
+                :disabled-date="disabledDate"
+                :disabled-time="disabledTime"
+              />
+            </el-form-item>
+
+            <el-form-item label="备注" prop="remark">
+              <el-input
+                v-model="bookForm.remark"
+                type="textarea"
+                :rows="4"
+                maxlength="200"
+                show-word-limit
+                placeholder="可填写特殊需求，选填"
+              />
+            </el-form-item>
+          </el-form>
+        </section>
       </div>
 
       <template #footer>
@@ -200,10 +209,10 @@
 <script setup>
 import { reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { createAppointment } from '@/api/appointment'
 import { getMyPets } from '@/api/pet'
-import { getServicePage } from '@/api/service'
+import { getServiceDetail, getServicePage } from '@/api/service'
 import { getCosUrl } from '@/utils/request'
 import { createSvgPlaceholder } from '@/utils/placeholders'
 
@@ -219,6 +228,14 @@ const keyword = ref('')
 const priceMin = ref(null)
 const priceMax = ref(null)
 const sort = ref('')
+const serviceTypes = [
+  { value: 1, label: '美容' },
+  { value: 2, label: '洗护' },
+  { value: 3, label: '医疗' },
+  { value: 4, label: '寄养' },
+  { value: 5, label: '训练' },
+  { value: 6, label: '接送' }
+]
 
 const showDetail = ref(false)
 const currentService = ref(null)
@@ -242,10 +259,12 @@ const bookRules = {
 
 const typeLabel = (type) => {
   const map = {
-    1: '洗护',
-    2: '美容',
+    1: '美容',
+    2: '洗护',
     3: '医疗',
-    4: '寄养'
+    4: '寄养',
+    5: '训练',
+    6: '接送'
   }
   return map[type] || '服务'
 }
@@ -323,6 +342,28 @@ const fetchServices = async () => {
   }
 }
 
+const openServiceFromQuery = async (serviceId) => {
+  const id = toNumber(serviceId)
+  if (!id) return
+  if (showDetail.value && Number(currentService.value?.id) === id) return
+
+  let service = services.value.find((item) => Number(item.id) === id)
+  if (!service) {
+    try {
+      const res = await getServiceDetail(id)
+      if (res.code === 200) {
+        service = res.data
+      }
+    } catch (error) {
+      console.error('获取服务详情失败', error)
+    }
+  }
+
+  if (service) {
+    openDetail(service)
+  }
+}
+
 const handlePageChange = () => {
   syncQuery()
 }
@@ -367,7 +408,7 @@ const loadMyPets = async () => {
   try {
     const res = await getMyPets(1, 100)
     if (res.code === 200) {
-      myPets.value = res.data?.records || []
+      myPets.value = (res.data?.records || []).filter((pet) => pet.status === 1)
     }
   } catch (error) {
     console.error('获取宠物列表失败', error)
@@ -397,8 +438,8 @@ const handleBook = async () => {
     })
 
     if (res.code === 200) {
-      ElMessage.success('预约成功')
       showDetail.value = false
+      await showBookingSuccess(res.data)
     } else {
       ElMessage.error(res.message || '预约失败')
     }
@@ -409,11 +450,36 @@ const handleBook = async () => {
   }
 }
 
+const showBookingSuccess = async (data = {}) => {
+  try {
+    await ElMessageBox.confirm(
+      '预约已创建，请完成订单支付。支付完成后，服务人员会按预约时间为您安排服务。',
+      '预约成功',
+      {
+        type: 'success',
+        confirmButtonText: '去支付',
+        cancelButtonText: '查看我的预约',
+        distinguishCancelAndClose: true
+      }
+    )
+    if (data.orderId) {
+      router.push({ path: '/checkout', query: { orderId: data.orderId } })
+    } else {
+      router.push('/my-orders')
+    }
+  } catch (action) {
+    if (action === 'cancel') {
+      router.push('/my-appointments')
+    }
+  }
+}
+
 watch(
   () => route.query,
-  (query) => {
+  async (query) => {
     applyQuery(query)
-    fetchServices()
+    await fetchServices()
+    await openServiceFromQuery(query.serviceId)
   },
   { immediate: true }
 )
@@ -463,8 +529,8 @@ watch(
 .list-filter-panel {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 18px;
+  align-items: center;
+  gap: 14px;
   padding: 18px 20px;
   border-radius: 24px;
   background: linear-gradient(135deg, rgba(232, 240, 252, 0.72), rgba(255, 255, 255, 0.98));
@@ -474,26 +540,53 @@ watch(
 
 .filter-group {
   display: flex;
-  flex-wrap: wrap;
-  gap: 14px 18px;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 12px;
   flex: 1;
+  min-width: 0;
 }
 
 .filter-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 10px;
+  flex-wrap: nowrap;
   padding: 6px 10px;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.75);
   border: 1px solid rgba(65, 90, 130, 0.08);
+  white-space: nowrap;
+}
+
+.type-select {
+  width: 126px;
+}
+
+.sort-select {
+  width: 150px;
+}
+
+.filter-row :deep(.el-select__wrapper) {
+  min-height: 40px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(65, 90, 130, 0.14) inset;
+}
+
+.filter-row :deep(.el-select__selected-item) {
+  color: var(--ink-body);
+  font-weight: 400;
 }
 
 .range-inputs {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.range-inputs :deep(.el-input-number) {
+  width: 104px;
 }
 
 .range-sep,
@@ -509,18 +602,18 @@ watch(
 }
 
 .filter-actions {
-  min-width: 280px;
+  width: 310px;
   display: flex;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 .filter-actions :deep(.el-input__inner) {
-  min-width: 240px;
+  min-width: 0;
 }
 
 .search-input {
   width: 100%;
-  max-width: 360px;
 }
 
 .search-input :deep(.el-input__wrapper) {
@@ -624,7 +717,7 @@ watch(
 }
 
 .service-card-body {
-  min-height: 180px;
+  min-height: 136px;
 }
 
 .list-card-title-row,
@@ -641,6 +734,13 @@ watch(
   margin: 0;
 }
 
+.list-card-title-row h3 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .list-card-note {
   color: var(--brand-strong);
   font-size: 14px;
@@ -649,8 +749,24 @@ watch(
 
 .list-card-desc {
   color: var(--ink-body);
-  line-height: 1.7;
-  flex: 1;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.service-facts-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+
+.service-facts-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .list-card-meta-row span,
@@ -663,6 +779,7 @@ watch(
   color: var(--brand-strong);
   font-size: 22px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .pagination-wrap {
@@ -673,14 +790,39 @@ watch(
 
 .detail-panel {
   display: grid;
-  gap: 16px;
+  gap: 12px;
+  max-height: 64vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.detail-panel-split {
+  grid-template-columns: minmax(0, 0.9fr) minmax(300px, 1fr);
+  align-items: start;
+}
+
+.detail-info-column,
+.book-form-column {
+  display: grid;
+  gap: 12px;
+}
+
+.book-form-column {
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+
+.book-form-column h3 {
+  margin: 0 0 2px;
+  font-size: 18px;
 }
 
 .detail-media {
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: 14px;
   background: var(--surface-soft);
-  min-height: 200px;
+  height: 220px;
 }
 
 .detail-media img {
@@ -692,25 +834,25 @@ watch(
 .detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px;
 }
 
 .detail-item {
-  padding: 14px;
-  border-radius: 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
   background: var(--surface-soft);
 }
 
 .detail-item span {
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   color: var(--ink-muted);
   font-size: 12px;
 }
 
 .detail-item strong {
   color: var(--ink-strong);
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .detail-item .price {
@@ -718,14 +860,38 @@ watch(
 }
 
 .detail-desc {
+  margin: 0;
   color: var(--ink-body);
-  line-height: 1.7;
+  line-height: 1.6;
+  font-size: 14px;
 }
 
 .select-empty {
   padding: 12px;
   color: var(--ink-muted);
   text-align: center;
+}
+
+:deep(.service-book-dialog .el-dialog__body) {
+  padding: 12px 20px;
+}
+
+:deep(.service-book-dialog .el-dialog__footer) {
+  padding-top: 8px;
+}
+
+:deep(.service-book-dialog .el-divider) {
+  margin: 8px 0 16px;
+}
+
+:deep(.service-book-dialog .el-form-item) {
+  margin-bottom: 14px;
+}
+
+@media (max-width: 900px) {
+  .detail-panel-split {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 1080px) {

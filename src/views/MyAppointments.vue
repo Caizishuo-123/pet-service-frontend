@@ -43,9 +43,14 @@
             <div class="card-body">
               <div class="card-row-top">
                 <h4 class="card-title">{{ item.serviceName || '未知服务' }}</h4>
-                <el-tag :type="statusTagType(item.status)" size="small" class="status-tag">
-                  {{ statusLabel(item.status) }}
-                </el-tag>
+                <div class="card-tags">
+                  <el-tag :type="statusTagType(item.status)" size="small" class="status-tag">
+                    {{ statusLabel(item.status) }}
+                  </el-tag>
+                  <el-tag :type="payTagType(item.orderPayStatus)" size="small" effect="plain" class="status-tag">
+                    {{ payStatusLabel(item.orderPayStatus) }}
+                  </el-tag>
+                </div>
               </div>
               <p class="card-info">
                 <span>宠物 · {{ item.petName || '未知宠物' }}</span>
@@ -58,7 +63,10 @@
             </div>
             <div class="card-actions">
               <el-button type="primary" size="small" plain @click="openDetail(item)">详情</el-button>
-              <el-button v-if="item.status === 1" type="danger" size="small" plain @click="handleCancel(item)">
+              <el-button v-if="item.canPay" type="primary" size="small" @click="handlePay(item)">
+                去支付
+              </el-button>
+              <el-button v-if="item.status === 1 && item.orderPayStatus !== 1" type="danger" size="small" plain @click="handleCancel(item)">
                 取消预约
               </el-button>
             </div>
@@ -110,6 +118,20 @@
             <span>服务价格</span>
             <strong>¥{{ detail.servicePrice }}</strong>
           </div>
+          <div class="detail-item" v-if="detail.orderNo">
+            <span>订单编号</span>
+            <strong>{{ detail.orderNo }}</strong>
+          </div>
+          <div class="detail-item" v-if="detail.orderId">
+            <span>支付状态</span>
+            <el-tag :type="payTagType(detail.orderPayStatus)" size="small">
+              {{ payStatusLabel(detail.orderPayStatus) }}
+            </el-tag>
+          </div>
+          <div class="detail-item" v-if="detail.orderTotalPrice">
+            <span>订单金额</span>
+            <strong>¥{{ formatPrice(detail.orderTotalPrice) }}</strong>
+          </div>
           <div class="detail-item" v-if="detail.remark">
             <span>备注</span>
             <strong>{{ detail.remark }}</strong>
@@ -117,6 +139,7 @@
         </div>
       </div>
       <template #footer>
+        <el-button v-if="detail?.canPay" type="primary" @click="handlePay(detail)">去支付</el-button>
         <el-button @click="detailVisible = false">关闭</el-button>
       </template>
     </el-dialog>
@@ -149,6 +172,19 @@ const statusLabel = (s) => {
 const statusTagType = (s) => {
   const map = { 1: 'primary', 2: 'success', 3: 'info' }
   return map[s] || 'info'
+}
+
+const payStatusLabel = (s) => {
+  if (s === 1) return '已支付'
+  if (s === 0) return '待支付'
+  return '未生成订单'
+}
+
+const payTagType = (s) => (s === 1 ? 'success' : s === 0 ? 'warning' : 'info')
+
+const formatPrice = (price) => {
+  const amount = Number(price || 0)
+  return Number.isFinite(amount) ? amount.toFixed(2) : '0.00'
 }
 
 const formatTime = (t) => {
@@ -217,6 +253,14 @@ const handleCancel = async (item) => {
   } catch (e) {
     ElMessage.error(e.response?.data?.message || '取消失败，请稍后重试')
   }
+}
+
+const handlePay = (item) => {
+  if (!item?.orderId) {
+    ElMessage.warning('该预约暂未生成订单')
+    return
+  }
+  router.push({ path: '/checkout', query: { orderId: item.orderId } })
 }
 
 const openDetail = async (item) => {
@@ -364,6 +408,13 @@ onMounted(() => fetchAppointments())
   border-radius: 999px;
 }
 
+.card-tags {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .card-info {
   font-size: 13px;
   color: var(--ink-body);
@@ -385,6 +436,9 @@ onMounted(() => fetchAppointments())
 
 .card-actions {
   flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .loading-area {

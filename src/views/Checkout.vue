@@ -1,15 +1,19 @@
 <template>
-  <div class="checkout-page" v-loading.fullscreen.lock="paying" element-loading-text="正在安全支付中..."
-    element-loading-background="rgba(255, 255, 255, 0.9)">
-
+  <div
+    class="checkout-page"
+    v-loading.fullscreen.lock="paying"
+    element-loading-text="正在处理模拟支付..."
+    element-loading-background="rgba(255, 255, 255, 0.9)"
+  >
     <div class="page-header">
       <el-button text @click="router.back()">
         <el-icon>
           <ArrowLeft />
-        </el-icon> 返回订单
+        </el-icon>
+        返回订单
       </el-button>
       <h2>收银台</h2>
-      <div style="width: 80px"></div> <!-- 占位保持居中 -->
+      <div style="width: 80px"></div>
     </div>
 
     <template v-if="order">
@@ -18,33 +22,68 @@
           <el-icon><Select /></el-icon>
         </div>
         <h2 class="success-title">支付成功</h2>
-        <p class="success-desc">您的订单已支付完成，服务人员将尽快与您联系。</p>
-        <div class="success-amount">¥{{ order.totalPrice || '0.00' }}</div>
+        <p class="success-desc">{{ getSuccessDescription(order) }}</p>
+        <div class="success-amount">¥{{ formatPrice(order.totalPrice) }}</div>
         <p class="countdown-text">{{ countdown }} 秒后自动返回订单列表...</p>
-        <el-button type="primary" round @click="router.replace('/my-orders')" style="margin-top:20px;width:160px">
-          立即查看订单
-        </el-button>
+        <div class="success-actions">
+          <el-button type="primary" round @click="router.replace('/my-orders')">
+            立即查看订单
+          </el-button>
+          <el-button v-if="order.orderType === 2" round plain @click="router.replace('/my-pets')">
+            查看我的宠物
+          </el-button>
+          <el-button v-if="order.orderType === 1" round plain @click="router.replace('/my-appointments')">
+            查看我的预约
+          </el-button>
+        </div>
       </div>
 
       <div v-else class="checkout-container">
-        <!-- 订单金额与信息 -->
         <div class="order-summary-card">
           <div class="amount-wrap">
             <span class="currency">¥</span>
-            <span class="amount">{{ order.totalPrice || '0.00' }}</span>
+            <span class="amount">{{ formatPrice(order.totalPrice) }}</span>
           </div>
-          <p class="order-no-text">订单编号：{{ order.id }}</p>
+          <p class="order-no-text">订单编号：{{ order.orderNo || order.id }}</p>
 
           <el-divider border-style="dashed" />
 
           <div class="order-detail-list">
             <div class="detail-row">
-              <span class="label">服务名称</span>
-              <span class="value">{{ order.serviceName || '未知服务' }}</span>
+              <span class="label">订单类型</span>
+              <span class="value">{{ getOrderTypeText(order) }}</span>
             </div>
             <div class="detail-row">
-              <span class="label">服务宠物</span>
+              <span class="label">{{ getBusinessLabel(order.orderType) }}</span>
+              <span class="value">{{ getBusinessName(order) }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="label">业务状态</span>
+              <span class="value">{{ getBusinessStatusText(order) }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="label">关联宠物</span>
               <span class="value">{{ order.petName || '未知宠物' }}</span>
+            </div>
+            <div class="detail-row" v-if="order.orderType === 1 && order.appointmentTime">
+              <span class="label">预约时间</span>
+              <span class="value">{{ formatTime(order.appointmentTime) }}</span>
+            </div>
+            <div class="detail-row" v-if="order.orderType === 2">
+              <span class="label">领取方式</span>
+              <span class="value">{{ formatDeliveryType(order.deliveryType) }}</span>
+            </div>
+            <div class="detail-row" v-if="order.orderType === 2 && order.contactPhone">
+              <span class="label">联系电话</span>
+              <span class="value">{{ order.contactPhone }}</span>
+            </div>
+            <div class="detail-row" v-if="order.orderType === 2 && order.address">
+              <span class="label">送达地址</span>
+              <span class="value">{{ order.address }}</span>
+            </div>
+            <div class="detail-row" v-if="order.orderType === 2 && order.applyReason">
+              <span class="label">申请理由</span>
+              <span class="value multiline">{{ order.applyReason }}</span>
             </div>
             <div class="detail-row" v-if="order.createTime">
               <span class="label">创建时间</span>
@@ -53,9 +92,11 @@
           </div>
         </div>
 
-        <!-- 支付方式选择 -->
         <div class="payment-methods">
           <h3 class="section-title">选择支付方式</h3>
+          <div v-if="order.canPay === false && order.cannotPayReason" class="checkout-alert">
+            当前订单不可支付：{{ order.cannotPayReason }}
+          </div>
 
           <div class="method-card" :class="{ active: payMethod === 1 }" @click="payMethod = 1">
             <div class="method-left">
@@ -92,15 +133,15 @@
           </div>
         </div>
 
-        <!-- 支付按钮 -->
         <div class="pay-action">
-          <el-button type="primary" size="large" class="pay-btn" @click="handlePay">
-            确认支付 ¥{{ order.totalPrice || '0.00' }}
+          <el-button type="primary" size="large" class="pay-btn" :disabled="order.canPay === false" @click="handlePay">
+            确认支付 ¥{{ formatPrice(order.totalPrice) }}
           </el-button>
           <p class="safe-tip">
             <el-icon>
               <Lock />
-            </el-icon> 平台担保交易，您的资金安全无忧
+            </el-icon>
+            当前为模拟支付演示流程，确认后将直接更新订单状态
           </p>
         </div>
       </div>
@@ -128,17 +169,60 @@ const router = useRouter()
 const order = ref(null)
 const loading = ref(true)
 
-const payMethod = ref(1) // 1 微信, 2 支付宝
+const payMethod = ref(1)
 const paying = ref(false)
 const success = ref(false)
 const countdown = ref(3)
 let timer = null
+
+const orderTypeMap = {
+  1: '服务预约',
+  2: '领养支付'
+}
+
+const deliveryTypeMap = {
+  1: '上门自取',
+  2: '送宠上门'
+}
 
 const formatTime = (t) => {
   if (!t) return ''
   const d = new Date(t)
   const pad = (n) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+const formatPrice = (price) => {
+  const amount = Number(price || 0)
+  return Number.isFinite(amount) ? amount.toFixed(2) : '0.00'
+}
+
+const formatDeliveryType = (type) => deliveryTypeMap[type] || '未填写'
+
+const getOrderTypeText = (item) => item?.orderTypeName || orderTypeMap[item?.orderType] || '普通订单'
+
+const getBusinessLabel = (orderType) => (orderType === 2 ? '业务类型' : '服务名称')
+
+const getBusinessName = (item) => item?.serviceName || item?.businessName || (item?.orderType === 2 ? '宠物领养' : '未知服务')
+
+const getBusinessStatusText = (item) => {
+  if (item?.businessStatusText) return item.businessStatusText
+  if (item?.orderType === 1) {
+    const map = { 1: '已预约', 2: '已完成', 3: '已取消' }
+    return map[item?.appointmentStatus] || '处理中'
+  }
+  if (item?.orderType === 2) {
+    const map = { 1: '待审核', 2: '待支付', 3: '已拒绝', 4: '已完成', 5: '已取消' }
+    return map[item?.adoptionStatus] || '处理中'
+  }
+  return '处理中'
+}
+
+const getSuccessDescription = (item) => {
+  if (item?.orderType === 2) {
+    return '领养订单已支付完成，宠物已加入我的宠物。'
+  }
+  return '您的订单已支付完成，服务人员将尽快与您联系。'
 }
 
 const fetchOrder = async () => {
@@ -151,7 +235,6 @@ const fetchOrder = async () => {
     const res = await getOrderDetail(orderId)
     if (res.code === 200) {
       order.value = res.data
-      // 如果已经支付过，直接显示成功状态或者跳回
       if (order.value.payStatus === 1) {
         ElMessage.info('该订单已完成支付')
         router.replace('/my-orders')
@@ -167,19 +250,20 @@ const fetchOrder = async () => {
 
 const handlePay = async () => {
   if (!order.value) return
+  if (order.value.canPay === false) {
+    ElMessage.warning(order.value.cannotPayReason || '当前订单不可支付')
+    return
+  }
 
-  // 1. 弹出遮罩层（全屏 Loading），显示正在支付...
   paying.value = true
 
-  // 2. 模拟真实的网络处理延迟 (沉浸式体验)
   setTimeout(async () => {
     try {
       const res = await simulatePay(order.value.id, payMethod.value)
       if (res.code === 200) {
         paying.value = false
-        success.value = true // 切换为成功付款界面
+        success.value = true
 
-        // 倒计时跳回列表
         timer = setInterval(() => {
           countdown.value--
           if (countdown.value <= 0) {
@@ -195,7 +279,7 @@ const handlePay = async () => {
       paying.value = false
       ElMessage.error(e.response?.data?.message || '支付异常，请重试')
     }
-  }, 1800) // 延迟1.8s
+  }, 1800)
 }
 
 onMounted(() => fetchOrder())
@@ -233,7 +317,6 @@ onUnmounted(() => {
   gap: 24px;
 }
 
-/* ========== Order Summary ========== */
 .order-summary-card {
   background: #fff;
   border-radius: 16px;
@@ -279,20 +362,26 @@ onUnmounted(() => {
 .detail-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 16px;
   font-size: 14px;
 }
 
 .detail-row .label {
   color: #909399;
+  flex-shrink: 0;
 }
 
 .detail-row .value {
   font-weight: 600;
   color: #303133;
+  text-align: right;
 }
 
-/* ========== Payment Methods ========== */
+.detail-row .value.multiline {
+  white-space: pre-wrap;
+}
+
 .section-title {
   font-size: 16px;
   font-weight: 700;
@@ -305,6 +394,15 @@ onUnmounted(() => {
   border-radius: 16px;
   padding: 24px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.checkout-alert {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(236, 169, 64, 0.12);
+  color: #9f6a1e;
+  font-size: 13px;
 }
 
 .method-card {
@@ -329,7 +427,7 @@ onUnmounted(() => {
 }
 
 .method-card.active {
-  border-color: #409EFF;
+  border-color: #409eff;
   background: #ecf5ff;
 }
 
@@ -371,7 +469,6 @@ onUnmounted(() => {
   margin: 0;
 }
 
-/* ========== Actions ========== */
 .pay-action {
   text-align: center;
   margin-top: 10px;
@@ -402,7 +499,6 @@ onUnmounted(() => {
   margin-top: 16px;
 }
 
-/* ========== Success ========== */
 .success-result {
   background: #fff;
   border-radius: 16px;
@@ -450,6 +546,17 @@ onUnmounted(() => {
   color: #909399;
 }
 
+.success-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.success-actions .el-button {
+  min-width: 140px;
+}
+
 @keyframes scaleIn {
   from {
     opacity: 0;
@@ -466,5 +573,16 @@ onUnmounted(() => {
   padding: 40px;
   background: #fff;
   border-radius: 16px;
+}
+
+@media (max-width: 640px) {
+  .detail-row {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .detail-row .value {
+    text-align: left;
+  }
 }
 </style>

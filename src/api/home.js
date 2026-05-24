@@ -26,3 +26,21 @@ export const getPosts = (page = 1, pageSize = 4) => {
     params: { page, pageSize }
   })
 }
+
+/**
+ * 获取平台公告（首页重要通知）
+ */
+export const getNotices = (page = 1, pageSize = 6) => {
+  return request.get('/post/notice', {
+    params: { page, pageSize }
+  })
+}
+
+/**
+ * 获取热门帖子（首页社区精选）
+ */
+export const getHotPosts = (page = 1, pageSize = 4) => {
+  return request.get('/post/hot', {
+    params: { page, pageSize }
+  })
+}

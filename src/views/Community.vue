@@ -4,34 +4,32 @@
       <div>
         <span class="page-kicker">Community</span>
         <h1 class="page-title">宠物社区</h1>
-        <p class="page-desc">社区页也沿用同样的节奏：页头说明、分类筛选、规整列表和统一卡片信息，不再单独长一套样式。</p>
       </div>
       <div class="hero-actions">
         <article class="hero-summary-card">
           <strong>{{ total }}</strong>
           <span>社区内容数量</span>
         </article>
-        <el-button type="primary" round size="large" @click="openCreateDialog">
-          <el-icon><Edit /></el-icon>
-          发布帖子
-        </el-button>
       </div>
     </section>
 
     <section class="section-block surface-panel filter-panel list-filter-panel">
       <div class="filter-group">
         <div class="filter-row">
-          <span class="filter-label">帖子分类</span>
-          <el-radio-group v-model="currentCategory" @change="handleCategoryChange">
-            <el-radio-button :value="null">全部</el-radio-button>
-            <el-radio-button :value="1">分享</el-radio-button>
-            <el-radio-button :value="2">求助</el-radio-button>
-            <el-radio-button :value="3">科普</el-radio-button>
-            <el-radio-button :value="4">讨论</el-radio-button>
-            <el-radio-button :value="5">其他</el-radio-button>
-          </el-radio-group>
+          <span class="filter-label">内容类型</span>
+          <el-select v-model="currentType" class="type-select" @change="handleTypeChange">
+            <el-option label="全部内容" :value="0" />
+            <el-option label="普通帖子" :value="1" />
+            <el-option label="公告" :value="2" />
+          </el-select>
         </div>
-        <span class="soft-chip">支持发布图文内容</span>
+        <div class="filter-row">
+          <span class="filter-label">帖子分类</span>
+          <el-select v-model="currentCategory" class="category-select" placeholder="全部分类" clearable :disabled="currentType === 2" @change="handleCategoryChange">
+            <el-option label="全部分类" :value="null" />
+            <el-option v-for="item in categoryOptions" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </div>
       </div>
       <div class="filter-actions">
         <el-input
@@ -46,6 +44,10 @@
             <el-button @click="handleSearch">搜索</el-button>
           </template>
         </el-input>
+        <el-button type="primary" round class="create-post-btn" @click="openCreateDialog">
+          <el-icon><Edit /></el-icon>
+          发布帖子
+        </el-button>
       </div>
     </section>
 
@@ -115,57 +117,69 @@
           <div class="community-spotlight">
             <div class="spotlight-shell">
               <div class="spotlight-grid">
-              <div class="surface-panel hot-panel">
-                <div class="panel-header">
-                  <div>
-                    <h3>热榜</h3>
-                    <p>按点赞与评论热度排序</p>
+                <div class="surface-panel notice-panel">
+                  <div class="panel-header">
+                    <div>
+                      <h3>公告</h3>
+                      <p>活动提醒、规则更新与社区通知</p>
+                    </div>
                   </div>
-                </div>
-                <div v-if="hotLoading" class="panel-loading">
-                  <el-skeleton :rows="4" animated />
-                </div>
-                <div v-else>
-                  <div v-if="hotPosts.length" class="hot-list">
-                    <article class="hot-item" v-for="(post, idx) in hotPosts" :key="post.id" @click="router.push(`/post/${post.id}`)">
-                      <span class="hot-rank">#{{ idx + 1 }}</span>
-                      <div class="hot-content">
-                        <h4>{{ post.title }}</h4>
-                        <div class="hot-meta">
-                          <span>{{ getPostCategoryLabel(post) }}</span>
-                          <span>👍 {{ post.likeCount || 0 }}</span>
-                          <span>💬 {{ post.commentCount || 0 }}</span>
+                  <div v-if="noticeLoading" class="panel-loading">
+                    <el-skeleton :rows="4" animated />
+                  </div>
+                  <div v-else>
+                    <div v-if="noticePosts.length" class="notice-list">
+                      <article
+                        v-for="(notice, idx) in noticePosts"
+                        :key="notice.id"
+                        class="notice-item"
+                        @click="router.push(`/post/${notice.id}`)"
+                      >
+                        <span class="notice-item-index">{{ String(idx + 1).padStart(2, '0') }}</span>
+                        <div class="notice-item-body">
+                          <h4>{{ notice.title }}</h4>
+                          <p>{{ truncate(notice.content, 44) || '点击查看完整公告详情。' }}</p>
                         </div>
-                      </div>
-                    </article>
+                        <span class="notice-item-time">{{ formatTime(notice.createTime) }}</span>
+                      </article>
+                    </div>
+                    <el-empty v-else description="暂无公告" :image-size="80" />
                   </div>
-                  <el-empty v-else description="暂无热榜内容" :image-size="80" />
                 </div>
-              </div>
 
-              <div class="surface-panel notice-panel">
-                <div class="panel-header">
-                  <div>
-                    <h3>公告专区</h3>
-                    <p>社区运营信息与活动提醒</p>
+                <div class="surface-panel hot-panel">
+                  <div class="panel-header">
+                    <div>
+                      <h3>热榜</h3>
+                      <p>按点赞和评论热度排序</p>
+                    </div>
+                  </div>
+                  <div v-if="hotLoading" class="panel-loading">
+                    <el-skeleton :rows="4" animated />
+                  </div>
+                  <div v-else>
+                    <div v-if="hotPosts.length" class="hot-list">
+                      <article
+                        class="hot-item"
+                        v-for="(post, idx) in hotPosts"
+                        :key="post.id"
+                        @click="router.push(`/post/${post.id}`)"
+                      >
+                        <span class="hot-rank" :class="`rank-${idx + 1}`">#{{ idx + 1 }}</span>
+                        <div class="hot-content">
+                          <h4>{{ post.title }}</h4>
+                          <div class="hot-meta">
+                            <span>{{ getPostCategoryLabel(post) }}</span>
+                            <span><el-icon><StarFilled /></el-icon>{{ post.likeCount || 0 }}</span>
+                            <span><el-icon><ChatDotRound /></el-icon>{{ post.commentCount || 0 }}</span>
+                          </div>
+                        </div>
+                        <span class="hot-item-score">{{ getHotScore(post) }}</span>
+                      </article>
+                    </div>
+                    <el-empty v-else description="暂无热榜内容" :image-size="80" />
                   </div>
                 </div>
-                <div v-if="noticeLoading" class="panel-loading">
-                  <el-skeleton :rows="4" animated />
-                </div>
-                <div v-else>
-                  <div v-if="noticePosts.length" class="notice-list">
-                    <article class="notice-item" v-for="notice in noticePosts" :key="notice.id" @click="router.push(`/post/${notice.id}`)">
-                      <div class="notice-title">
-                        <span class="notice-dot"></span>
-                        {{ notice.title }}
-                      </div>
-                      <div class="notice-time">{{ formatTime(notice.createTime) }}</div>
-                    </article>
-                  </div>
-                  <el-empty v-else description="暂无公告" :image-size="80" />
-                </div>
-              </div>
               </div>
             </div>
           </div>
@@ -215,6 +229,9 @@
               <span>添加图片</span>
             </div>
           </el-upload>
+          <el-button v-if="createForm.imageUrl" size="small" text type="danger" @click="createForm.imageUrl = ''">
+            移除图片
+          </el-button>
           <div class="upload-tip">支持 JPG/PNG/WEBP 格式，不超过 5MB</div>
         </el-form-item>
       </el-form>
@@ -231,7 +248,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Edit, Plus } from '@element-plus/icons-vue'
+import { ChatDotRound, Edit, Plus, StarFilled } from '@element-plus/icons-vue'
 import { createPost, getHotPostPage, getNoticePage, getPostPage } from '@/api/post'
 import { getCosUrl } from '@/utils/request'
 import { createSvgPlaceholder } from '@/utils/placeholders'
@@ -240,6 +257,7 @@ const router = useRouter()
 const posts = ref([])
 const total = ref(0)
 const loading = ref(false)
+const currentType = ref(1)
 const currentCategory = ref(null)
 const page = ref(1)
 const pageSize = 10
@@ -259,6 +277,14 @@ const uploadHeaders = computed(() => {
 })
 
 const postPlaceholder = createSvgPlaceholder('POST', '#e9f0f8', '#416894', 420, 320)
+
+const categoryOptions = [
+  { value: 1, label: '分享' },
+  { value: 2, label: '求助' },
+  { value: 3, label: '科普' },
+  { value: 4, label: '讨论' },
+  { value: 5, label: '其他' }
+]
 
 const createForm = reactive({
   category: 1,
@@ -327,6 +353,8 @@ const truncate = (text, length) => {
   return text.length > length ? `${text.slice(0, length)}...` : text
 }
 
+const getHotScore = (post) => ((post?.likeCount || 0) * 2) + (post?.commentCount || 0)
+
 const formatTime = (time) => {
   if (!time) return ''
   const date = new Date(time)
@@ -345,6 +373,13 @@ const setImageFallback = (event, fallback) => {
 }
 
 const handleCategoryChange = () => {
+  handleSearch()
+}
+
+const handleTypeChange = () => {
+  if (currentType.value === 2) {
+    currentCategory.value = null
+  }
   handleSearch()
 }
 
@@ -385,7 +420,8 @@ const fetchPosts = async () => {
   loading.value = true
   try {
     const params = { page: page.value, pageSize }
-    if (currentCategory.value) params.category = currentCategory.value
+    params.type = currentType.value
+    if (currentCategory.value && currentType.value !== 2) params.category = currentCategory.value
     if (keyword.value) params.keyword = keyword.value
 
     const res = await getPostPage(params)
@@ -431,8 +467,14 @@ const handleCreate = async () => {
     if (res.code === 200) {
       ElMessage.success('发布成功')
       showCreate.value = false
-      page.value = 1
-      fetchPosts()
+      const postId = res.data?.id
+      fetchHotPosts()
+      if (postId) {
+        router.push(`/post/${postId}`)
+      } else {
+        page.value = 1
+        fetchPosts()
+      }
     } else {
       ElMessage.error(res.message || '发布失败')
     }
@@ -512,8 +554,8 @@ onMounted(fetchNoticePosts)
 .list-filter-panel {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 18px;
+  align-items: center;
+  gap: 14px;
   padding: 18px 20px;
   border-radius: 24px;
   background: linear-gradient(135deg, rgba(232, 240, 252, 0.72), rgba(255, 255, 255, 0.98));
@@ -523,20 +565,43 @@ onMounted(fetchNoticePosts)
 
 .filter-group {
   display: flex;
-  flex-wrap: wrap;
-  gap: 14px 18px;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 12px;
   flex: 1;
+  min-width: 0;
 }
 
 .filter-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 10px;
+  flex-wrap: nowrap;
   padding: 6px 10px;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.75);
   border: 1px solid rgba(65, 90, 130, 0.08);
+  white-space: nowrap;
+}
+
+.type-select {
+  width: 126px;
+}
+
+.category-select {
+  width: 126px;
+}
+
+.filter-row :deep(.el-select__wrapper) {
+  min-height: 40px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(65, 90, 130, 0.14) inset;
+}
+
+.filter-row :deep(.el-select__selected-item) {
+  color: var(--ink-body);
+  font-weight: 400;
 }
 
 .filter-label {
@@ -546,18 +611,27 @@ onMounted(fetchNoticePosts)
 }
 
 .filter-actions {
-  min-width: 280px;
+  width: 450px;
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .filter-actions :deep(.el-input__inner) {
-  min-width: 240px;
+  min-width: 0;
 }
 
 .search-input {
   width: 100%;
-  max-width: 360px;
+}
+
+.create-post-btn {
+  flex-shrink: 0;
+  height: 40px;
+  min-width: 116px;
+  padding: 0 20px;
 }
 
 .search-input :deep(.el-input__wrapper) {
@@ -578,9 +652,10 @@ onMounted(fetchNoticePosts)
 }
 
 .search-input :deep(.el-input-group__append .el-button) {
-  height: 36px;
-  margin: 4px;
-  padding: 0 18px;
+  height: 40px;
+  min-width: 82px;
+  margin: 0;
+  padding: 0 20px;
   border-radius: 999px;
   border: none !important;
   color: #fff;
@@ -614,199 +689,188 @@ onMounted(fetchNoticePosts)
 
 .spotlight-shell {
   width: 100%;
-  padding: 12px;
-  border-radius: 24px;
-  background: linear-gradient(135deg, rgba(224, 234, 248, 0.65), rgba(255, 255, 255, 0.96));
-  border: 1px solid rgba(61, 95, 140, 0.08);
-  box-shadow: 0 18px 40px rgba(37, 54, 74, 0.08);
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .spotlight-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 14px;
+  gap: 16px;
   width: 100%;
 }
 
 .community-spotlight .surface-panel {
   border-radius: 22px;
-  border: 1px solid rgba(61, 95, 140, 0.1);
-  background: #fff;
-  box-shadow: 0 14px 26px rgba(37, 54, 74, 0.08);
+  border: 1px solid rgba(61, 95, 140, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 12px 28px rgba(37, 54, 74, 0.06);
+  padding: 18px;
+}
+
+.notice-panel,
+.hot-panel {
+  background: rgba(255, 255, 255, 0.94);
 }
 
 .panel-header {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 18px;
-  padding: 0 2px 10px;
-  border-radius: 0;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid rgba(61, 95, 140, 0.12);
+  gap: 10px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(61, 95, 140, 0.08);
 }
 
 .panel-header h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
-  position: relative;
-  padding-left: 18px;
   color: var(--ink-strong);
-}
-
-.panel-header h3::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  transform: translateY(-50%);
-  background: linear-gradient(135deg, #3f6fb0, #6c8bd9);
-  box-shadow: 0 0 0 4px rgba(63, 111, 176, 0.12);
-}
-
-.notice-panel .panel-header h3::before {
-  background: linear-gradient(135deg, #6a8fcb, #86b0e4);
-  box-shadow: 0 0 0 6px rgba(134, 176, 228, 0.14);
+  line-height: 1.3;
 }
 
 .panel-header p {
-  margin: 0;
+  margin: 4px 0 0;
   color: var(--ink-muted);
-  font-size: 11px;
-  padding: 0;
-  border-radius: 0;
-  background: transparent;
-  border: none;
-  white-space: nowrap;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .panel-loading {
-  padding: 12px 0;
+  padding: 8px 0 0;
 }
 
-.hot-list,
-.notice-list {
-  display: flex;
-  flex-direction: column;
+.notice-list,
+.hot-list {
+  display: grid;
   gap: 10px;
 }
 
+.notice-item,
 .hot-item {
-  position: relative;
-  display: flex;
+  display: grid;
+  align-items: center;
   gap: 12px;
   padding: 12px 14px;
-  border-radius: 14px;
+  border-radius: 16px;
   border: 1px solid rgba(61, 95, 140, 0.08);
   background: #fff;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
-.hot-item::before {
-  content: '';
-  position: absolute;
-  left: 10px;
-  top: 10px;
-  bottom: 10px;
-  width: 2px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, rgba(75, 121, 194, 0.6), rgba(75, 121, 194, 0.1));
-}
-
+.notice-item:hover,
 .hot-item:hover {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-sm);
+  border-color: rgba(86, 125, 181, 0.18);
+  box-shadow: 0 10px 20px rgba(37, 54, 74, 0.08);
+}
+
+.notice-item {
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+}
+
+.notice-item-index {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #3e6798;
+  background: rgba(95, 136, 198, 0.12);
+}
+
+.notice-item-body {
+  min-width: 0;
+}
+
+.notice-item-body h4,
+.hot-content h4 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--ink-strong);
+}
+
+.notice-item-body p {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+.notice-item-time {
+  font-size: 12px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.hot-item {
+  grid-template-columns: 52px minmax(0, 1fr) 48px;
 }
 
 .hot-rank {
-  min-width: 30px;
-  height: 30px;
-  border-radius: 9px;
-  background: rgba(95, 136, 198, 0.12);
-  color: #2e507d;
-  display: flex;
+  width: 52px;
+  height: 36px;
+  border-radius: 12px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  font-size: 13px;
   font-weight: 700;
-  font-size: 12px;
+  color: #9b581f;
+  background: rgba(240, 166, 91, 0.14);
 }
 
-.hot-content h4 {
-  margin: 0 0 4px;
-  font-size: 13px;
-  color: var(--ink-strong);
+.hot-rank.rank-1 {
+  color: #8f4d15;
+  background: rgba(234, 152, 66, 0.18);
+}
+
+.hot-rank.rank-2 {
+  color: #a05d24;
+  background: rgba(242, 176, 108, 0.14);
+}
+
+.hot-rank.rank-3,
+.hot-rank.rank-4,
+.hot-rank.rank-5 {
+  color: #a76b38;
+  background: rgba(246, 211, 174, 0.18);
+}
+
+.hot-content {
+  min-width: 0;
 }
 
 .hot-meta {
   display: flex;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
   color: var(--ink-muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 
-.notice-item {
-  position: relative;
-  padding: 12px 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(61, 95, 140, 0.08);
-  background: #fff;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.notice-item::before {
-  content: '';
-  position: absolute;
-  left: 10px;
-  top: 10px;
-  bottom: 10px;
-  width: 2px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, rgba(106, 143, 203, 0.6), rgba(106, 143, 203, 0.12));
-}
-
-.notice-item:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-sm);
-}
-
-.notice-title {
+.hot-meta span {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--ink-strong);
-  margin-bottom: 0;
+  gap: 3px;
 }
 
-.notice-time {
-  font-size: 11px;
-  color: var(--ink-muted);
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgba(95, 136, 198, 0.1);
-  border: 1px solid rgba(95, 136, 198, 0.18);
-  white-space: nowrap;
-}
-
-.notice-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #6a8fcb, #86b0e4);
-  box-shadow: 0 0 0 6px rgba(134, 176, 228, 0.18);
+.hot-item-score {
+  text-align: right;
+  font-size: 16px;
+  font-weight: 700;
+  color: #c06a25;
 }
 
 .community-card {
@@ -1000,11 +1064,39 @@ onMounted(fetchNoticePosts)
     flex-direction: column;
     align-items: flex-start;
   }
+
+  .panel-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 @media (max-width: 640px) {
   .list-filter-panel {
     padding: 18px;
+  }
+
+  .community-spotlight .surface-panel {
+    padding: 16px;
+  }
+
+  .notice-item,
+  .hot-item {
+    grid-template-columns: 1fr;
+  }
+
+  .notice-item-index,
+  .hot-rank {
+    width: 42px;
+  }
+
+  .hot-rank {
+    width: 52px;
+  }
+
+  .notice-item-time,
+  .hot-item-score {
+    text-align: left;
   }
 }
 </style>

@@ -6,7 +6,7 @@
           <button class="brand" type="button" @click="router.push('/home')">
             <span class="brand-mark">宠</span>
             <span class="brand-copy">
-              <span class="brand-name">宠乐园</span>
+              <span class="brand-name">宠物乐园</span>
               <span class="brand-note">宠物服务平台</span>
             </span>
           </button>
@@ -99,7 +99,7 @@
     <el-footer class="footer-shell">
       <div class="page-shell footer">
         <div class="footer-main">
-          <strong>宠乐园</strong>
+          <strong>宠物乐园</strong>
           <span>领养、服务和社区内容统一整理在一个轻量的平台里。</span>
         </div>
         <span>© 2026 Pet Park</span>

@@ -4,11 +4,7 @@
       <div class="hero-copy">
         <span class="page-kicker">我的帖子</span>
         <h1 class="page-title">管理你的社区内容</h1>
-        <p class="page-desc">集中查看自己发布的帖子，支持按分类筛选并快速删除。</p>
-      </div>
-      <div class="hero-tags">
-        <span class="soft-chip">支持分类筛选</span>
-        <span class="soft-chip">可快速删除帖子</span>
+        <p class="page-desc">集中查看自己发布的帖子，支持按分类筛选、编辑和删除。</p>
       </div>
     </section>
 
@@ -61,6 +57,7 @@
                 </div>
                 <div class="post-actions">
                   <el-button size="small" @click="goDetail(post.id)">查看</el-button>
+                  <el-button size="small" type="primary" plain @click="openEdit(post)">编辑</el-button>
                   <el-button size="small" type="danger" plain @click="handleDelete(post)">删除</el-button>
                 </div>
               </div>
@@ -84,14 +81,54 @@
         background
       />
     </div>
+
+    <el-dialog v-model="editVisible" title="编辑帖子" width="560px" :close-on-click-modal="false">
+      <el-form ref="editFormRef" :model="editForm" :rules="editRules" label-width="80px">
+        <el-form-item label="分类" prop="category">
+          <el-radio-group v-model="editForm.category">
+            <el-radio :value="1">分享</el-radio>
+            <el-radio :value="2">求助</el-radio>
+            <el-radio :value="3">科普</el-radio>
+            <el-radio :value="4">讨论</el-radio>
+            <el-radio :value="5">其他</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="标题" prop="title">
+          <el-input v-model="editForm.title" maxlength="50" show-word-limit placeholder="请输入帖子标题" />
+        </el-form-item>
+        <el-form-item label="内容" prop="content">
+          <el-input v-model="editForm.content" type="textarea" :rows="6" maxlength="2000" show-word-limit placeholder="请输入帖子内容" />
+        </el-form-item>
+        <el-form-item label="图片">
+          <el-upload
+            class="post-image-uploader"
+            action="/api/cos/upload?type=post"
+            :headers="uploadHeaders"
+            :show-file-list="false"
+            :on-success="handleImageSuccess"
+            :on-error="handleImageError"
+            :before-upload="beforeImageUpload"
+          >
+            <img v-if="editForm.imageUrl" :src="getCosUrl(editForm.imageUrl)" class="edit-image" />
+            <div v-else class="edit-upload-placeholder">添加图片</div>
+          </el-upload>
+          <el-button v-if="editForm.imageUrl" size="small" text type="danger" @click="editForm.imageUrl = ''">移除图片</el-button>
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="editVisible = false">取消</el-button>
+        <el-button type="primary" :loading="editing" @click="handleUpdate">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { deletePost, getMyPostPage } from '@/api/post'
+import { deletePost, getMyPostPage, updatePost } from '@/api/post'
 import { getCosUrl } from '@/utils/request'
 import { createSvgPlaceholder } from '@/utils/placeholders'
 
@@ -102,6 +139,34 @@ const loading = ref(false)
 const currentCategory = ref(null)
 const page = ref(1)
 const pageSize = 10
+const editVisible = ref(false)
+const editing = ref(false)
+const editFormRef = ref(null)
+
+const editForm = reactive({
+  id: null,
+  category: 1,
+  title: '',
+  content: '',
+  imageUrl: ''
+})
+
+const editRules = {
+  category: [{ required: true, message: '请选择分类', trigger: 'change' }],
+  title: [
+    { required: true, message: '请输入标题', trigger: 'blur' },
+    { min: 2, max: 50, message: '标题长度应为 2-50 个字符', trigger: 'blur' }
+  ],
+  content: [
+    { required: true, message: '请输入内容', trigger: 'blur' },
+    { min: 5, message: '内容至少 5 个字', trigger: 'blur' }
+  ]
+}
+
+const uploadHeaders = computed(() => {
+  const token = localStorage.getItem('token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+})
 
 const postPlaceholder = createSvgPlaceholder('POST', '#e9f0f8', '#416894', 420, 320)
 
@@ -156,6 +221,62 @@ const fetchPosts = async () => {
 
 const goDetail = (id) => {
   router.push(`/post/${id}`)
+}
+
+const openEdit = (post) => {
+  editForm.id = post.id
+  editForm.category = post.category || 1
+  editForm.title = post.title || ''
+  editForm.content = post.content || ''
+  editForm.imageUrl = post.imageUrl || ''
+  editVisible.value = true
+}
+
+const handleImageSuccess = (response) => {
+  if (response?.code === 200) {
+    editForm.imageUrl = response.data
+    ElMessage.success('上传成功')
+  } else {
+    ElMessage.error(response?.message || '上传失败')
+  }
+}
+
+const handleImageError = () => {
+  ElMessage.error('上传失败，请稍后重试')
+}
+
+const beforeImageUpload = (rawFile) => {
+  const isValidFormat = rawFile.type === 'image/jpeg' || rawFile.type === 'image/png' || rawFile.type === 'image/webp'
+  const isLt5M = rawFile.size / 1024 / 1024 < 5
+  if (!isValidFormat) ElMessage.error('上传图片只能是 JPG/PNG/WEBP 格式')
+  if (!isLt5M) ElMessage.error('上传图片大小不能超过 5MB')
+  return isValidFormat && isLt5M
+}
+
+const handleUpdate = async () => {
+  const valid = await editFormRef.value?.validate().catch(() => false)
+  if (!valid) return
+  editing.value = true
+  try {
+    const res = await updatePost({
+      id: editForm.id,
+      category: editForm.category,
+      title: editForm.title,
+      content: editForm.content,
+      imageUrl: editForm.imageUrl || null
+    })
+    if (res.code === 200) {
+      ElMessage.success('帖子已更新')
+      editVisible.value = false
+      fetchPosts()
+    } else {
+      ElMessage.error(res.message || '更新失败')
+    }
+  } catch (e) {
+    ElMessage.error(e.response?.data?.message || '更新失败')
+  } finally {
+    editing.value = false
+  }
 }
 
 const handleDelete = async (post) => {
@@ -335,6 +456,30 @@ onMounted(fetchPosts)
 .post-actions {
   display: flex;
   gap: 8px;
+}
+
+.post-image-uploader :deep(.el-upload) {
+  width: 180px;
+  height: 120px;
+  border: 1px dashed var(--line-soft);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface-soft);
+}
+
+.edit-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.edit-upload-placeholder {
+  width: 180px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-muted);
 }
 
 .pagination-wrap {

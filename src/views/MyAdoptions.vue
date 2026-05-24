@@ -4,11 +4,7 @@
       <div class="hero-copy">
         <span class="page-kicker">我的领养</span>
         <h1 class="page-title">跟踪领养申请进度</h1>
-        <p class="page-desc">查看每条申请的审核状态与进展，随时掌握领养结果。</p>
-      </div>
-      <div class="hero-tags">
-        <span class="soft-chip">支持状态筛选</span>
-        <span class="soft-chip">进度清晰可视化</span>
+        <p class="page-desc">查看申请、审核、待支付和完成状态，待审核申请也可以主动取消。</p>
       </div>
     </section>
 
@@ -16,15 +12,16 @@
       <div class="section-heading adoptions-heading">
         <div>
           <h2>申请记录</h2>
-          <p>等待审核、通过、拒绝和完成的申请都在这里。</p>
+          <p>待审核、待支付、拒绝、完成和取消的申请都会保留在这里。</p>
         </div>
         <div class="filter-shell">
           <el-radio-group v-model="currentStatus" @change="handleStatusChange" size="large">
             <el-radio-button :value="null">全部</el-radio-button>
             <el-radio-button :value="1">待审核</el-radio-button>
-            <el-radio-button :value="2">已通过</el-radio-button>
+            <el-radio-button :value="2">待支付</el-radio-button>
             <el-radio-button :value="3">已拒绝</el-radio-button>
             <el-radio-button :value="4">已完成</el-radio-button>
+            <el-radio-button :value="5">已取消</el-radio-button>
           </el-radio-group>
         </div>
       </div>
@@ -37,14 +34,10 @@
         <div v-if="applies.length" class="apply-list">
           <article class="apply-card" v-for="item in applies" :key="item.id">
             <div class="card-left">
-              <img
-                v-if="item.petImage"
-                :src="getCosUrl(item.petImage)"
-                class="pet-avatar"
-                @error="(e) => e.target.src = 'https://via.placeholder.com/60?text=pet'"
-              />
+              <img v-if="item.petImage" :src="getCosUrl(item.petImage)" class="pet-avatar" @error="setImageFallback" />
               <div v-else class="pet-avatar-placeholder">宠</div>
             </div>
+
             <div class="card-body">
               <div class="card-row-top">
                 <h4 class="card-title">{{ item.petName || '未知宠物' }}</h4>
@@ -55,13 +48,15 @@
               <p class="card-info">
                 <span>品种 · {{ item.petBreed || '未知' }}</span>
                 <span>方式 · {{ deliveryLabel(item.deliveryType) }}</span>
+                <span v-if="item.orderTotalPrice !== undefined && item.orderTotalPrice !== null">金额 · {{ formatPriceText(item.orderTotalPrice) }}</span>
               </p>
-              <p class="card-time" v-if="item.createTime">
-                申请时间 · {{ formatTime(item.createTime) }}
-              </p>
+              <p class="card-time" v-if="item.createTime">申请时间 · {{ formatTime(item.createTime) }}</p>
               <p class="card-remark" v-if="item.applyReason">理由 · {{ item.applyReason }}</p>
             </div>
+
             <div class="card-actions">
+              <el-button v-if="canPay(item)" type="primary" size="small" @click="goPay(item)">去支付</el-button>
+              <el-button v-if="item.status === 1" size="small" plain type="warning" @click="handleCancel(item)">取消申请</el-button>
               <el-button size="small" plain @click="openDetail(item)">详情</el-button>
             </div>
           </article>
@@ -78,15 +73,16 @@
         @current-change="fetchApplies" background />
     </div>
 
-    <el-dialog v-model="detailVisible" title="领养申请详情" width="680px" destroy-on-close>
+    <el-dialog v-model="detailVisible" title="领养申请详情" width="720px" destroy-on-close>
       <div v-if="detailLoading" class="detail-loading">
         <el-skeleton :rows="4" animated />
       </div>
       <div v-else-if="detail" class="detail-content">
         <el-steps align-center class="status-steps">
-          <el-step title="待审核" :status="adoptionStepStatus(detail.status, 0)" />
+          <el-step title="提交申请" :status="adoptionStepStatus(detail.status, 0)" />
           <el-step title="审核结果" :status="adoptionStepStatus(detail.status, 1)" />
-          <el-step title="已完成" :status="adoptionStepStatus(detail.status, 2)" />
+          <el-step title="待支付" :status="adoptionStepStatus(detail.status, 2)" />
+          <el-step title="领养完成" :status="adoptionStepStatus(detail.status, 3)" />
         </el-steps>
 
         <div class="detail-grid">
@@ -95,8 +91,16 @@
             <strong>{{ detail.petName || '未知宠物' }}</strong>
           </div>
           <div class="detail-item">
+            <span>申请状态</span>
+            <strong>{{ statusLabel(detail.status) }}</strong>
+          </div>
+          <div class="detail-item">
             <span>品种</span>
             <strong>{{ detail.petBreed || '-' }}</strong>
+          </div>
+          <div class="detail-item">
+            <span>领养费用</span>
+            <strong>{{ formatPriceText(detail.orderTotalPrice ?? detail.petAdoptionFee) }}</strong>
           </div>
           <div class="detail-item">
             <span>领取方式</span>
@@ -110,7 +114,15 @@
             <span>送达地址</span>
             <strong>{{ detail.address }}</strong>
           </div>
-          <div class="detail-item" v-if="detail.applyReason">
+          <div class="detail-item" v-if="detail.orderNo">
+            <span>订单编号</span>
+            <strong>{{ detail.orderNo }}</strong>
+          </div>
+          <div class="detail-item full" v-if="detail.petDescription">
+            <span>送养说明</span>
+            <strong>{{ detail.petDescription }}</strong>
+          </div>
+          <div class="detail-item full" v-if="detail.applyReason">
             <span>申请理由</span>
             <strong>{{ detail.applyReason }}</strong>
           </div>
@@ -118,6 +130,8 @@
       </div>
       <template #footer>
         <el-button @click="detailVisible = false">关闭</el-button>
+        <el-button v-if="detail?.status === 1" type="warning" plain @click="handleCancel(detail)">取消申请</el-button>
+        <el-button v-if="canPay(detail)" type="primary" @click="goPay(detail)">去支付</el-button>
       </template>
     </el-dialog>
   </div>
@@ -126,9 +140,10 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getMyApplies, getApplyDetail } from '@/api/adoption'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { getMyApplies, getApplyDetail, cancelApply } from '@/api/adoption'
 import { getCosUrl } from '@/utils/request'
-import { ElMessage } from 'element-plus'
+import { createSvgPlaceholder } from '@/utils/placeholders'
 
 const router = useRouter()
 const applies = ref([])
@@ -137,48 +152,58 @@ const loading = ref(false)
 const currentStatus = ref(null)
 const page = ref(1)
 const pageSize = 10
-
 const detailVisible = ref(false)
 const detailLoading = ref(false)
 const detail = ref(null)
+const petPlaceholder = createSvgPlaceholder('PET', '#eaf0f8', '#416894', 120, 120)
 
-const statusLabel = (s) => {
-  const map = { 1: '待审核', 2: '已通过', 3: '已拒绝', 4: '已完成' }
-  return map[s] || '未知'
+const statusLabel = (status) => {
+  const map = { 1: '待审核', 2: '待支付', 3: '已拒绝', 4: '已完成', 5: '已取消' }
+  return map[status] || '未知'
 }
 
-const statusTagType = (s) => {
-  const map = { 1: 'warning', 2: 'success', 3: 'danger', 4: 'info' }
-  return map[s] || 'info'
+const statusTagType = (status) => {
+  const map = { 1: 'warning', 2: 'primary', 3: 'danger', 4: 'success', 5: 'info' }
+  return map[status] || 'info'
 }
 
-const deliveryLabel = (d) => {
+const deliveryLabel = (type) => {
   const map = { 1: '上门自取', 2: '送宠上门' }
-  return map[d] || '未选择'
+  return map[type] || '未选择'
 }
 
-const formatTime = (t) => {
-  if (!t) return ''
-  const d = new Date(t)
+const formatTime = (value) => {
+  if (!value) return ''
+  const d = new Date(value)
   const pad = (n) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+const formatPriceText = (value) => {
+  const price = Number(value || 0)
+  return price <= 0 ? '免费领养' : `¥${price.toFixed(2)}`
+}
+
+const setImageFallback = (event) => {
+  if (event?.target && event.target.src !== petPlaceholder) {
+    event.target.src = petPlaceholder
+  }
+}
+
+const canPay = (item) => item?.status === 2 && item?.orderId && item?.orderPayStatus === 0
+
 const adoptionStepStatus = (status, index) => {
-  if (status === 1) {
-    return index === 0 ? 'process' : 'wait'
-  }
+  if (status === 1) return index === 0 ? 'process' : 'wait'
   if (status === 2) {
-    return index <= 1 ? 'success' : 'wait'
+    if (index < 2) return 'success'
+    return index === 2 ? 'process' : 'wait'
   }
-  if (status === 3) {
+  if (status === 3 || status === 5) {
     if (index === 0) return 'success'
     if (index === 1) return 'error'
     return 'wait'
   }
-  if (status === 4) {
-    return 'success'
-  }
+  if (status === 4) return 'success'
   return 'wait'
 }
 
@@ -191,7 +216,7 @@ const fetchApplies = async () => {
   loading.value = true
   try {
     const params = { page: page.value, pageSize }
-    if (currentStatus.value) params.status = currentStatus.value
+    if (currentStatus.value !== null) params.status = currentStatus.value
     const res = await getMyApplies(params)
     if (res.code === 200) {
       applies.value = res.data?.records || []
@@ -224,6 +249,33 @@ const openDetail = async (item) => {
   }
 }
 
+const handleCancel = (item) => {
+  if (!item?.id || item.status !== 1) return
+  ElMessageBox.confirm('确认取消这条待审核的领养申请吗？取消后该记录会保留为已取消。', '取消申请', {
+    confirmButtonText: '确认取消',
+    cancelButtonText: '再想想',
+    type: 'warning'
+  }).then(async () => {
+    try {
+      const res = await cancelApply(item.id)
+      if (res.code === 200) {
+        ElMessage.success('申请已取消')
+        detailVisible.value = false
+        fetchApplies()
+      } else {
+        ElMessage.error(res.message || '取消失败')
+      }
+    } catch (e) {
+      ElMessage.error(e.response?.data?.message || '取消失败')
+    }
+  })
+}
+
+const goPay = (item) => {
+  if (!item?.orderId) return
+  router.push({ path: '/checkout', query: { orderId: item.orderId } })
+}
+
 onMounted(() => fetchApplies())
 </script>
 
@@ -243,13 +295,6 @@ onMounted(() => fetchApplies())
 .hero-copy {
   flex: 1;
   min-width: 0;
-}
-
-.hero-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
 }
 
 .adoptions-panel {
@@ -285,13 +330,13 @@ onMounted(() => fetchApplies())
 }
 
 .apply-card {
-  background: var(--surface-strong);
-  border-radius: var(--radius-md);
-  padding: 20px 22px;
   display: flex;
   align-items: center;
   gap: 20px;
+  padding: 20px 22px;
   border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: var(--surface-strong);
   box-shadow: var(--shadow-sm);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
@@ -301,26 +346,30 @@ onMounted(() => fetchApplies())
   box-shadow: var(--shadow-md);
 }
 
-.card-left {
+.card-left,
+.card-actions {
   flex-shrink: 0;
 }
 
-.pet-avatar {
-  width: 64px;
-  height: 64px;
-  border-radius: 16px;
-  object-fit: cover;
-}
-
+.pet-avatar,
 .pet-avatar-placeholder {
   width: 64px;
   height: 64px;
   border-radius: 16px;
-  background: var(--surface-soft);
+}
+
+.pet-avatar {
+  object-fit: cover;
+}
+
+.pet-avatar-placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
+  background: var(--surface-soft);
+  color: var(--brand-strong);
   font-size: 24px;
+  font-weight: 800;
 }
 
 .card-body {
@@ -337,9 +386,10 @@ onMounted(() => fetchApplies())
 }
 
 .card-title {
+  margin: 0;
+  color: var(--ink-strong);
   font-size: 16px;
   font-weight: 700;
-  color: var(--ink-strong);
 }
 
 .status-tag {
@@ -347,26 +397,29 @@ onMounted(() => fetchApplies())
 }
 
 .card-info {
-  font-size: 13px;
-  color: var(--ink-body);
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
-  margin-bottom: 4px;
+  margin: 0 0 4px;
+  color: var(--ink-body);
+  font-size: 13px;
 }
 
 .card-time {
-  font-size: 13px;
+  margin: 0 0 2px;
   color: var(--ink-muted);
-  margin-bottom: 2px;
+  font-size: 13px;
 }
 
 .card-remark {
-  font-size: 12px;
+  margin: 0;
   color: var(--ink-muted);
+  font-size: 12px;
 }
 
 .card-actions {
-  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
 }
 
 .loading-area {
@@ -396,17 +449,26 @@ onMounted(() => fetchApplies())
 }
 
 .detail-item {
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: var(--surface-soft);
   display: flex;
   flex-direction: column;
   gap: 6px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+.detail-item.full {
+  grid-column: 1 / -1;
 }
 
 .detail-item span {
-  font-size: 12px;
   color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.detail-item strong {
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 @media (max-width: 960px) {
@@ -420,31 +482,7 @@ onMounted(() => fetchApplies())
   }
 
   .apply-card {
-    flex-direction: column;
     align-items: flex-start;
-  }
-
-  .card-row-top {
-    width: 100%;
-  }
-}
-
-@media (max-width: 640px) {
-  .adoptions-heading {
-    gap: 12px;
-  }
-
-  .filter-shell {
-    width: 100%;
-  }
-
-  .card-info {
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .detail-grid {
-    grid-template-columns: 1fr;
   }
 }
 </style>

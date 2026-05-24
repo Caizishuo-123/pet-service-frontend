@@ -8,15 +8,6 @@ export const getAdoptionPage = (params) => {
 }
 
 /**
- * 获取可领养宠物品种列表
- */
-export const getAdoptionBreeds = (type) => {
-  const params = {}
-  if (type) params.type = type
-  return request.get('/pet/breeds', { params })
-}
-
-/**
  * 获取宠物详情
  */
 export const getPetDetail = (id) => {
@@ -49,4 +40,22 @@ export const updatePet = (data) => {
  */
 export const deletePet = (id) => {
   return request.delete(`/pet/delete/${id}`)
+}
+
+/**
+ * 提交送养审核
+ */
+export const submitPetForAdoption = (id, adoptionFee) => {
+  return request.put(`/pet/submitAdoption/${id}`, null, {
+    params: {
+      adoptionFee
+    }
+  })
+}
+
+/**
+ * 取消送养
+ */
+export const cancelPetAdoption = (id) => {
+  return request.put(`/pet/cancelAdoption/${id}`)
 }
